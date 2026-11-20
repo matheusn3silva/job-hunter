@@ -63,3 +63,18 @@ variações como "nodejs", adicione-as em `keywords`.
 
 Para criar um filtro: herde de `BaseFilter`, defina `name`, implemente `accepts`
 e adicione a classe em `DEFAULT_FILTERS` (`filters/chain.py`).
+
+## Memória (Parte 4)
+`storage.JobRepository` guarda as vagas já processadas em SQLite
+(`data/jobs.db`, criado automaticamente; o `sqlite3` já vem com o Python,
+nada a instalar). Todo o SQL fica nessa classe (padrão Repository).
+
+    with JobRepository("data/jobs.db") as repo:
+        novas = repo.filter_unseen(vagas)   # remove as já vistas
+        ...
+        repo.mark_seen(top_n)               # lembra destas nas próximas execuções
+
+- A chave é `Job.uid` (empresa + título + URL).
+- Marcar a mesma vaga de novo é ignorado; `count()` e `has_seen(uid)` ajudam a inspecionar.
+- Erros de arquivo/SQL viram `StorageError` com mensagem clara.
+- O banco fica fora do git (`.gitignore`). Apagar `data/jobs.db` "esquece" tudo.

@@ -8,7 +8,7 @@ JobHunter finds developer job postings (Java, JavaScript, Python), filters and r
 
 Scrapers → Filters → Drop already-seen → Ranking → Top N → Tailor résumé → Save memory
 
-Scrapers (Part 2) and filters (Part 3) exist, plus models/config. There is no CLI entry point yet.
+Scrapers (Part 2), filters (Part 3) and the seen-jobs storage (Part 4) exist, plus models/config. There is no pipeline service or CLI entry point yet. There is no CLI entry point yet.
 
 Code, docstrings, comments, error messages and the README are written in **Portuguese (pt-BR)**. Keep new code in the same language.
 
@@ -38,6 +38,7 @@ Package lives in `src/jobhunter/` (src layout).
   - `ScraperRunner.run(criteria)` runs every source, logs failures into `runner.errors` without aborting the others, and dedups by `uid`.
   - To add a source: create `scrapers/<site>.py`, register it in `ScraperFactory.REGISTRY`, add an entry to `config/sources.yaml`.
 - **Filters** (`filters/`): `BaseFilter.accepts(job) -> bool`, one class per criterion in `rules.py` (keywords, excluded keywords, seniority by **title only**, location/remote regions, salary). `FilterChain.from_criteria(criteria)` builds the default chain from `DEFAULT_FILTERS`; `apply(jobs)` keeps jobs approved by every filter and counts discards per filter `name` in `rejected`. Term matching uses `utils.text.contains_term` (whole words).
+- **Storage** (`storage/`): `JobRepository(db_path)` (Repository pattern, all SQL lives there) keeps processed jobs in SQLite table `seen_jobs`, keyed by `Job.uid`. `filter_unseen(jobs)` keeps order, `mark_seen(jobs)` uses `INSERT OR IGNORE` and returns how many were new, plus `has_seen`, `count`, `close`/context manager. `":memory:"` works for tests; parent folders are created; `sqlite3` errors become `StorageError`. The caller decides which jobs to mark (planned: only the top N).
 - **`utils.text`**: `contains_term` (whole-word, case-insensitive), `strip_html` (BeautifulSoup) and `parse_datetime` (ISO-8601, always returns tz-aware datetimes, UTC when none given, so dates from different sources can be compared).
 
 Source-specific constraints that shape the code:
@@ -56,7 +57,7 @@ Tests never hit the network. Use the `make_client(payload, status=200)` fixture 
 
 Parts 1 and 2 were designed in a Claude Web chat before moving to Claude Code. Decisions already made there:
 
-- **Planned modules** (not created yet): `ranking/`, `resume/`, `storage/` (SQLite "seen" repository), `services/` (pipeline orchestration) and `main.py`. Each pipeline stage is its own class.
+- **Planned modules** (not created yet): `ranking/`, `resume/`, `services/` (pipeline orchestration) and `main.py`. Each pipeline stage is its own class.
 - **Résumé**: the base résumé is a **PDF** (`data/resume/curriculo.pdf`). Tailored résumés will be generated with the Anthropic API from the job description + base résumé, **never inventing experience**.
 - **Ranking**: score by keywords / seniority / location; semantic similarity may be added later.
 - **Filters (Part 3, implemented), answered by the user**:
@@ -241,6 +242,8 @@ Create tags only for stable versions after integration into `main`, not for ever
 Never merge into `main`, create tags, or publish releases automatically without explicit user authorization.
 
 Merges into `main` use `git merge --no-ff` with an English title in the format `Part N <name>` (e.g. `Part 3 filters`), consistent with the English commit messages. Always show the merge title to the user before merging; an approved plan containing the title counts as authorization.
+
+Right after merging a part into `main`, create and push its annotated SemVer tag in the same step (e.g. `git tag -a v0.4.0 -m "v0.4.0: <summary>"` then `git push origin v0.4.0`). The tag is listed in the plan, so plan approval covers it.
 
 ## 8. Mandatory Workflow for Every Development Stage
 
