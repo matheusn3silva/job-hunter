@@ -69,6 +69,10 @@ Parts 1 and 2 were designed in a Claude Web chat before moving to Claude Code. D
 - **Distribution (final part)**: make installation on new machines easy (install script and/or Docker).
 - **Communication**: the user prefers short answers and low token usage.
 
+## Database and local installs
+
+Job memory uses **SQLite** (`data/jobs.db`, Python's built-in `sqlite3`), which is just a file and needs no server. Never install a database server on the user's machine; if one is ever needed, run it with Docker.
+
 ## Git workflow
 
 Each project part goes on a branch named `parte-N-nome` (e.g. `parte-2-scrapers`). When the part is done it is committed and the branch is pushed automatically; merging into `main` only happens with explicit user authorization. Full rules in section 7 below.
@@ -165,14 +169,17 @@ Documentation should be educational and help the developer understand how the pr
 
 The user is developing this project while learning.
 
-Whenever implementing a feature:
+**Plan first, then implement.** Before creating or editing any code, present a short plan and wait for the user's approval:
 
-1. Briefly explain its purpose.
-2. Explain the architectural decision and why it was chosen.
-3. Present the changes made.
-4. Explain how the implementation works.
-5. Report which tests were executed and their results.
-6. Suggest the next step without proceeding to it automatically.
+1. Purpose of the change.
+2. Architectural decision and why it was chosen.
+3. Files that will be created or changed and how the implementation will work.
+4. Tests that will be added or run.
+5. Commit message(s) and, when applicable, the merge title and tag.
+
+Once the user approves the plan, implement it, run the tests, commit and push **without asking for confirmation again** (the approved plan is the authorization, including any merge/tag it lists). If something must deviate from the plan, stop and explain.
+
+After finishing, give a short summary: what was done, test results, commits, branch and push status, and the suggested next step (without starting it).
 
 Avoid excessively long responses and unnecessary token consumption.
 
@@ -233,18 +240,21 @@ Create tags only for stable versions after integration into `main`, not for ever
 
 Never merge into `main`, create tags, or publish releases automatically without explicit user authorization.
 
+Merges into `main` use `git merge --no-ff` with an English title in the format `Part N <name>` (e.g. `Part 3 filters`), consistent with the English commit messages. Always show the merge title to the user before merging; an approved plan containing the title counts as authorization.
+
 ## 8. Mandatory Workflow for Every Development Stage
 
 1. Inspect the current project structure and Git status.
 2. Confirm the correct branch for the requested task.
-3. Implement only the requested stage or feature.
-4. Create or update relevant unit tests.
-5. Update the relevant documentation.
-6. Run the tests.
-7. Review `git diff` and the files that will be committed.
-8. Create a commit following Conventional Commits.
-9. Push the branch to GitHub.
-10. Provide the user with a summary of the changes, tests, commit, branch, and push status.
+3. Present the plan (section 6) and wait for the user's approval.
+4. Implement only the approved stage or feature.
+5. Create or update relevant unit tests.
+6. Update the relevant documentation.
+7. Run the tests.
+8. Review `git diff` and the files that will be committed.
+9. Create a commit following Conventional Commits.
+10. Push the branch to GitHub.
+11. Provide the user with a summary of the changes, tests, commit, branch, and push status.
 
 Never execute destructive commands such as `git reset --hard`, delete branches, or overwrite the user's changes without explicit authorization.
 
