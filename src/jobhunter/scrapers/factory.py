@@ -6,19 +6,28 @@ import httpx
 
 from jobhunter.config.settings import SourceConfig
 from jobhunter.scrapers.base import BaseScraper, ScraperError
+from jobhunter.scrapers.github import GitHubVagasScraper
 from jobhunter.scrapers.gupy import GupyScraper
+from jobhunter.scrapers.jobicy import JobicyScraper
 from jobhunter.scrapers.remotive import RemotiveScraper
+from jobhunter.scrapers.weworkremotely import WeWorkRemotelyScraper
 
 
 class ScraperFactory:
     """Escolhe a classe de scraper pelo ``name`` da fonte no sources.yaml.
 
     Para adicionar um site novo: crie a classe e registre-a em ``REGISTRY``.
+    Fontes diferentes podem usar a mesma classe (ex.: repositórios do GitHub).
     """
 
     REGISTRY: dict[str, type[BaseScraper]] = {
         "gupy": GupyScraper,
         "remotive": RemotiveScraper,
+        "jobicy": JobicyScraper,
+        "weworkremotely": WeWorkRemotelyScraper,
+        # Vários repositórios do GitHub usam o mesmo scraper.
+        "github-frontendbr": GitHubVagasScraper,
+        "github-backendbr": GitHubVagasScraper,
     }
 
     @classmethod

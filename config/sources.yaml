@@ -1,11 +1,36 @@
-# O "name" escolhe o scraper (gupy | remotive). Desligue com enabled: false.
+# O "name" escolhe o scraper (veja ScraperFactory.REGISTRY). Desligue com enabled: false.
+# Todas as fontes são gratuitas e sem chave.
 sources:
+  # Vagas brasileiras publicadas como issues no GitHub (ótimas para júnior).
+  - name: github-frontendbr
+    type: api
+    url: https://api.github.com/repos/frontendbr/vagas/issues
+    enabled: true
+
+  - name: github-backendbr
+    type: api
+    url: https://api.github.com/repos/backend-br/vagas/issues
+    enabled: true
+
+  # Portal da Gupy: a API retorna 404 desde 2026-11 (investigar).
   - name: gupy
     type: api
     url: https://portal.api.gupy.io/api/job
     enabled: true
 
+  # Remotas abertas ao Brasil; limite de requisições apertado.
+  - name: jobicy
+    type: api
+    url: https://jobicy.com/api/v2/remote-jobs
+    enabled: true
+
+  # Remotas internacionais (API gratuita devolve poucas vagas).
   - name: remotive
     type: api
     url: https://remotive.com/api/remote-jobs
+    enabled: true
+
+  - name: weworkremotely
+    type: rss
+    url: https://weworkremotely.com/categories/remote-programming-jobs.rss
     enabled: true
