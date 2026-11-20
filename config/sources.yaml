@@ -1,6 +1,11 @@
-# URLs reais serão definidas na Parte 2, junto com os scrapers.
+# O "name" escolhe o scraper (gupy | remotive). Desligue com enabled: false.
 sources:
-  - name: exemplo-fonte
-    type: html        # html | rss | api
-    url: https://exemplo.com/vagas?q=python
-    enabled: false
+  - name: gupy
+    type: api
+    url: https://portal.api.gupy.io/api/job
+    enabled: true
+
+  - name: remotive
+    type: api
+    url: https://remotive.com/api/remote-jobs
+    enabled: true
