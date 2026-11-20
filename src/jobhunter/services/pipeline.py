@@ -1,4 +1,4 @@
-"""Orquestração de todas as etapas: da busca ao currículo adaptado."""
+"""Orquestração de todas as etapas: da busca ao prompt de currículo."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from jobhunter.config import Settings
 from jobhunter.filters import FilterChain
 from jobhunter.models import Job
 from jobhunter.ranking import JobRanker
-from jobhunter.resume import ResumeError, ResumeReader, ResumeTailor, ResumeWriter
+from jobhunter.resume import ResumeError, ResumePromptBuilder, ResumeReader, ResumeWriter
 from jobhunter.scrapers import ScraperRunner
 from jobhunter.storage import JobRepository
 
@@ -27,9 +27,9 @@ class PipelineResult:
         new: aprovadas que ainda não estavam na memória.
         rejected: quantas cada filtro descartou.
         top: as melhores vagas, já com nota.
-        files: currículos gerados.
+        files: prompts de currículo gerados (.txt).
         saved: quantas vagas foram gravadas na memória.
-        errors: falhas não fatais (fonte fora do ar, erro da API em uma vaga...).
+        errors: falhas não fatais (fonte fora do ar, currículo ilegível...).
     """
 
     collected: int = 0
@@ -46,12 +46,13 @@ class JobHuntPipeline:
     """Executa o fluxo completo do JobHunter.
 
     Scrapers → Filtros → Remover já vistas → Ranking → Top N →
-    Adaptar currículo → Salvar memória
+    Prompt de currículo (.txt) → Salvar memória
 
     Esta classe só coordena: cada etapa é feita pela classe responsável,
     recebida no construtor (assim os testes trocam qualquer peça por uma
-    falsa). Só as vagas com currículo gerado vão para a memória: se a API
-    falhar em uma vaga, ela volta na próxima execução.
+    falsa). Só as vagas com prompt salvo vão para a memória: se a gravação
+    falhar em uma vaga, ela volta na próxima execução. Sem custo: nenhuma
+    API paga é chamada.
     """
 
     def __init__(
@@ -62,7 +63,7 @@ class JobHuntPipeline:
         repository: JobRepository,
         ranker: JobRanker,
         reader: ResumeReader,
-        tailor: ResumeTailor,
+        prompt_builder: ResumePromptBuilder,
         writer: ResumeWriter,
     ):
         self.settings = settings
@@ -71,7 +72,7 @@ class JobHuntPipeline:
         self.repository = repository
         self.ranker = ranker
         self.reader = reader
-        self.tailor = tailor
+        self.prompt_builder = prompt_builder
         self.writer = writer
 
     @classmethod
@@ -85,7 +86,7 @@ class JobHuntPipeline:
             repository=repository,
             ranker=JobRanker.from_criteria(criteria),
             reader=ResumeReader(),
-            tailor=ResumeTailor(),
+            prompt_builder=ResumePromptBuilder(),
             writer=ResumeWriter(settings.output_dir),
         )
 
@@ -93,7 +94,7 @@ class JobHuntPipeline:
         """Executa todas as etapas.
 
         Args:
-            dry_run: só busca, filtra e ranqueia; não chama a IA nem grava
+            dry_run: só busca, filtra e ranqueia; não gera prompts nem grava
                 nada na memória (útil para conferir o ranking).
         """
         result = PipelineResult()
@@ -112,22 +113,26 @@ class JobHuntPipeline:
         if dry_run or not result.top:
             return result
 
-        processed = self._tailor_resumes(result)
+        processed = self._write_prompts(result)
         result.saved = self.repository.mark_seen(processed)
         return result
 
-    def _tailor_resumes(self, result: PipelineResult) -> list[Job]:
-        """Gera um currículo por vaga do top; devolve as vagas que deram certo."""
+    def _write_prompts(self, result: PipelineResult) -> list[Job]:
+        """Gera um prompt por vaga do top; devolve as vagas que deram certo.
+
+        Se o currículo não puder ser lido, os prompts saem mesmo assim,
+        pedindo para anexar o PDF na conversa (e um aviso vai para o relatório).
+        """
         try:
-            resume_text = self.reader.read(self.settings.resume_path)
+            resume_text: str | None = self.reader.read(self.settings.resume_path)
         except ResumeError as exc:
-            result.errors.append(str(exc))
-            return []
+            result.errors.append(f"{exc} Os prompts pedirão para anexar o currículo na conversa.")
+            resume_text = None
         processed = []
-        for job in result.top:
+        for rank, job in enumerate(result.top, start=1):
             try:
-                markdown = self.tailor.tailor(resume_text, job)
-                result.files.append(self.writer.write(job, markdown))
+                prompt = self.prompt_builder.build(job, resume_text)
+                result.files.append(self.writer.write(job, prompt, rank))
                 processed.append(job)
             except ResumeError as exc:
                 log.warning("%s", exc)

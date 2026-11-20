@@ -1,10 +1,11 @@
 # JobHunter
 
 Busca vagas de desenvolvedor (Java, JavaScript, Python), ranqueia pelo seu
-perfil, adapta seu currículo para as 10 melhores e lembra das vagas já vistas.
+perfil, gera prompts gratuitos para adaptar seu currículo às 10 melhores e
+lembra das vagas já vistas. Tudo gratuito: sem APIs pagas.
 
 ## Pipeline
-Scrapers → Filtros → Remover já vistas → Ranking → Top N → Adaptar currículo → Salvar memória
+Scrapers → Filtros → Remover já vistas → Ranking → Top N → Prompt de currículo (.txt) → Salvar memória
 
 ## Instalação (desenvolvimento)
     python -m venv .venv && source .venv/bin/activate
@@ -12,12 +13,12 @@ Scrapers → Filtros → Remover já vistas → Ranking → Top N → Adaptar cu
     pytest
 
 ## Uso
-    jobhunter --dry-run        # busca, filtra e mostra o ranking (sem IA, sem gravar)
-    jobhunter                  # gera os currículos do top N e salva na memória
+    jobhunter --dry-run        # busca, filtra e mostra o ranking (sem gravar nada)
+    jobhunter                  # gera os prompts de currículo do top N e salva na memória
     jobhunter --top 5 -v       # top 5, com logs detalhados
 
-Para gerar currículos é preciso `ANTHROPIC_API_KEY` (veja a Parte 6) e o
-seu currículo em `data/resume/curriculo.pdf`.
+Coloque seu currículo em `data/resume/curriculo.pdf` para o texto dele ir
+dentro dos prompts. Nada é pago: não há chave de API.
 
 ## Configuração
 - `config/settings.yaml`: seus critérios (stack, senioridade, salário, local).
@@ -118,27 +119,30 @@ avaliando um aspecto de 0 a 1:
 Empates: a vaga mais recente vem primeiro. Para mudar a importância de um
 aspecto, altere o `weight` da regra em `ranking/rules.py`.
 
-## Currículo (Parte 6)
-O módulo `resume` tem três classes, cada uma com uma responsabilidade:
+## Currículo: prompts gratuitos (Partes 6 e 9)
+O projeto é **100% gratuito**: em vez de chamar uma API paga, o JobHunter
+gera, para cada vaga do top N, um **prompt em `.txt`** que você cola numa IA
+de chat gratuita (ChatGPT, Gemini, Claude.ai) para adaptar o currículo.
 
 | Classe | Papel |
 |---|---|
 | `ResumeReader` | Extrai o texto do seu PDF (`pypdf`). PDF escaneado (só imagem) gera erro claro |
-| `ResumeTailor` | Pede ao Claude (`claude-opus-5-5`) uma versão do currículo para a vaga |
-| `ResumeWriter` | Salva em `data/output/<empresa>_<titulo>_<uid>.md` |
+| `ResumePromptBuilder` | Monta o prompt: regras + dados da vaga + texto do seu currículo |
+| `ResumeWriter` | Salva em `data/output/<posição>_<empresa>_<titulo>_<uid>.txt` (01 = melhor vaga) |
 
-Regras dadas à IA: **nunca inventar** experiências, empresas, datas ou
+Regras dentro do prompt: **nunca inventar** experiências, empresas, datas ou
 habilidades; só reordenar, reescrever e destacar o que já está no currículo,
-no idioma da vaga. Revise sempre o resultado antes de enviar.
+no idioma da vaga. A IA também lista o que mudou e os requisitos que você não
+tem. Revise sempre o resultado antes de enviar.
 
-Configuração da API: crie uma chave em console.anthropic.com e exporte
-`ANTHROPIC_API_KEY` (ou use `ant auth login`). Nunca coloque a chave no
-código nem no git (`.env` já é ignorado). Cada vaga adaptada é uma chamada
-paga; o texto do currículo vai com cache para baratear as chamadas seguintes.
-Se o modelo recusar um pedido, o servidor tenta outro modelo automaticamente
-(`fallbacks: "default"`).
+Sem `data/resume/curriculo.pdf`, os prompts são gerados mesmo assim e pedem
+para você anexar o currículo na conversa.
 
-Erros (arquivo, chave, limite de uso, rede, recusa) viram `ResumeError`.
+Como usar: abra o `.txt`, copie tudo, cole numa conversa nova da IA e
+copie o currículo adaptado para o seu editor (Word, Google Docs...).
+
+> Até a v0.7.0 o currículo era adaptado pela API paga da Anthropic; o código
+> antigo continua no histórico do git (tag `v0.7.0`).
 
 ## Pipeline e CLI (Parte 7)
 `services.JobHuntPipeline` só coordena as etapas; cada uma é feita pela classe
@@ -146,10 +150,10 @@ responsável, recebida no construtor (os testes trocam qualquer peça por uma
 falsa):
 
     ScraperRunner → FilterChain → JobRepository.filter_unseen → JobRanker.top
-    → ResumeReader/ResumeTailor/ResumeWriter → JobRepository.mark_seen
+    → ResumeReader/ResumePromptBuilder/ResumeWriter → JobRepository.mark_seen
 
-- `run(dry_run=True)` para antes da IA e não grava nada.
-- Só vagas com currículo gerado vão para a memória: se a API falhar em uma
+- `run(dry_run=True)` para antes dos prompts e não grava nada.
+- Só vagas com prompt salvo vão para a memória: se a gravação falhar em uma
   vaga, ela volta na próxima execução; a falha de uma não interrompe as outras.
 - O resultado (`PipelineResult`) traz contagens, descartes por filtro, top N,
   arquivos gerados e avisos, que a CLI (`main.py`) imprime como relatório.

@@ -9,13 +9,13 @@ from pypdf.errors import PdfReadError
 
 
 class ResumeError(RuntimeError):
-    """Falha ao ler, adaptar ou salvar um currículo (mensagem amigável)."""
+    """Falha ao ler o currículo ou salvar um prompt (mensagem amigável)."""
 
 
 class ResumeReader:
     """Extrai o texto do currículo base (PDF).
 
-    O texto extraído é o que vai para a IA adaptar. PDFs escaneados (só
+    O texto extraído entra no prompt que você cola numa IA de chat. PDFs escaneados (só
     imagem) não têm texto; nesse caso é preciso exportar o currículo de
     novo a partir do editor (Word, Google Docs, Canva...).
     """
