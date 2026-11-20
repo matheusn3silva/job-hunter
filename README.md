@@ -15,6 +15,7 @@ Scrapers → Filtros → Remover já vistas → Ranking → Top N → Adaptar cu
 - `config/settings.yaml`: seus critérios (stack, senioridade, salário, local).
   - `min_salary`: mínimo para júnior/pleno. `min_salary_internship`: mínimo para estágio.
   - `accept_unknown_salary`: aceita vagas sem salário divulgado.
+  - `remote_regions`: regiões aceitas em vagas remotas (Worldwide, LATAM, Brazil...).
 - `config/sources.yaml`: fontes de vagas (`enabled: false` desliga uma fonte).
 - Coloque seu currículo em `data/resume/curriculo.pdf`.
 
@@ -40,4 +41,25 @@ Para adicionar um site: crie `scrapers/meusite.py`, registre em
 | Fonte | Tipo | Observações |
 |---|---|---|
 | gupy | API do portal (não oficial) | 1 requisição por palavra-chave |
-| remotive | API pública | 1 requisição; máx. ~4/dia; vagas com 24h de atraso |"
+| remotive | API pública | 1 requisição; máx. ~4/dia; vagas com 24h de atraso |
+
+## Filtros (Parte 3)
+Cada critério é uma classe que herda de `BaseFilter` e implementa `accepts(job)`.
+`FilterChain.from_criteria(criteria)` monta a cadeia padrão; `apply(jobs)`
+devolve só as vagas aprovadas em todos os filtros e `rejected` mostra quantas
+cada filtro descartou (útil para calibrar o `settings.yaml`).
+
+| Filtro | Regra |
+|---|---|
+| `KeywordFilter` | A vaga cita ao menos uma tecnologia de `keywords` |
+| `ExcludedKeywordFilter` | Descarta se citar algo de `excluded_keywords` |
+| `SeniorityFilter` | Pelo **título**: aceita níveis de `seniority` ou vaga sem nível; descarta outros níveis (ex.: Sênior) |
+| `LocationFilter` | Remota: só sem restrição ou com região de `remote_regions` ("USA Only" sai). Presencial: cidade de `locations` |
+| `SalaryFilter` | Mínimo de estágio ou geral; sem salário passa se `accept_unknown_salary` |
+
+As palavras são comparadas como **palavras inteiras** (`utils.text.contains_term`):
+"java" não casa com "javascript" e ".net" casa com "asp.net". Para aceitar
+variações como "nodejs", adicione-as em `keywords`.
+
+Para criar um filtro: herde de `BaseFilter`, defina `name`, implemente `accepts`
+e adicione a classe em `DEFAULT_FILTERS` (`filters/chain.py`).

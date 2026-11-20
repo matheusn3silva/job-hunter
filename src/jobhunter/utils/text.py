@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 
 from bs4 import BeautifulSoup
@@ -25,3 +26,19 @@ def parse_datetime(value: str | None) -> datetime | None:
     except ValueError:
         return None
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def contains_term(text: str, term: str) -> bool:
+    """True se ``term`` aparece em ``text`` como palavra inteira.
+
+    Evita falsos positivos de substring: "java" não casa com "javascript"
+    e "senior" não casa com "seniority". Termos que começam ou terminam com
+    símbolo (ex.: ".net") só exigem limite de palavra no lado alfanumérico,
+    então ".net" casa com "asp.net". A comparação não diferencia maiúsculas.
+    """
+    term = term.strip().lower()
+    if not term:
+        return False
+    start = r"(?<!\w)" if re.match(r"\w", term) else ""
+    end = r"(?!\w)" if re.search(r"\w$", term) else ""
+    return re.search(start + re.escape(term) + end, text.lower()) is not None

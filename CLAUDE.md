@@ -8,7 +8,7 @@ JobHunter finds developer job postings (Java, JavaScript, Python), filters and r
 
 Scrapers → Filters → Drop already-seen → Ranking → Top N → Tailor résumé → Save memory
 
-Only the first stage (scrapers) plus models/config exist so far. There is no CLI entry point yet.
+Scrapers (Part 2) and filters (Part 3) exist, plus models/config. There is no CLI entry point yet.
 
 Code, docstrings, comments, error messages and the README are written in **Portuguese (pt-BR)**. Keep new code in the same language.
 
@@ -37,10 +37,11 @@ Package lives in `src/jobhunter/` (src layout).
   - `ScraperFactory.REGISTRY` maps the source's `name` (not `type`) in `sources.yaml` to a scraper class.
   - `ScraperRunner.run(criteria)` runs every source, logs failures into `runner.errors` without aborting the others, and dedups by `uid`.
   - To add a source: create `scrapers/<site>.py`, register it in `ScraperFactory.REGISTRY`, add an entry to `config/sources.yaml`.
-- **`utils.text`**: `strip_html` (BeautifulSoup) and `parse_datetime` (ISO-8601, always returns tz-aware datetimes, UTC when none given, so dates from different sources can be compared).
+- **Filters** (`filters/`): `BaseFilter.accepts(job) -> bool`, one class per criterion in `rules.py` (keywords, excluded keywords, seniority by **title only**, location/remote regions, salary). `FilterChain.from_criteria(criteria)` builds the default chain from `DEFAULT_FILTERS`; `apply(jobs)` keeps jobs approved by every filter and counts discards per filter `name` in `rejected`. Term matching uses `utils.text.contains_term` (whole words).
+- **`utils.text`**: `contains_term` (whole-word, case-insensitive), `strip_html` (BeautifulSoup) and `parse_datetime` (ISO-8601, always returns tz-aware datetimes, UTC when none given, so dates from different sources can be compared).
 
 Source-specific constraints that shape the code:
-- **gupy**: unofficial portal API; one request per keyword (empty term if no keywords), results merged by `uid`. Items missing title or URL are skipped.
+- **gupy**: unofficial portal API; `location` is `city, state, country` (country defaults to "Brasil", so the location filter accepts remote Gupy jobs); one request per keyword (empty term if no keywords), results merged by `uid`. Items missing title or URL are skipped.
 - **remotive**: public API with a tight rate limit (~4 calls/day) and 24h delay. It makes **one** request for the whole `software-dev` category and leaves keyword filtering to the filter stage. Job links must point to Remotive (terms of use). `candidate_required_location` becomes `location` so the location filter can drop country-restricted postings.
 
 ## Testing
@@ -55,18 +56,22 @@ Tests never hit the network. Use the `make_client(payload, status=200)` fixture 
 
 Parts 1 and 2 were designed in a Claude Web chat before moving to Claude Code. Decisions already made there:
 
-- **Planned modules** (not created yet): `filters/`, `ranking/`, `resume/`, `storage/` (SQLite "seen" repository), `services/` (pipeline orchestration) and `main.py`. Each pipeline stage is its own class.
+- **Planned modules** (not created yet): `ranking/`, `resume/`, `storage/` (SQLite "seen" repository), `services/` (pipeline orchestration) and `main.py`. Each pipeline stage is its own class.
 - **Résumé**: the base résumé is a **PDF** (`data/resume/curriculo.pdf`). Tailored résumés will be generated with the Anthropic API from the job description + base résumé, **never inventing experience**.
 - **Ranking**: score by keywords / seniority / location; semantic similarity may be added later.
-- **Filters (Part 3), answered by the user**:
+- **Filters (Part 3, implemented), answered by the user**:
   - Jobs that don't mention a seniority level (e.g. "Desenvolvedor Python") are **kept**; ranking gives them a lower score.
   - Remote jobs restricted to other countries (e.g. "USA Only") are **removed**; accept only Worldwide, LATAM and Brazil.
-  - A job is an internship when its title contains "estágio", "estagiário" or "intern" (`Job.is_internship`); salary minimums are R$ 2,000 (internship) / R$ 3,000 (others), and jobs without salary pass (`accept_unknown_salary`).
+  - A job is an internship when its title contains "estágio", "estagiário" or "intern" (`Job.is_internship`, plain substring match); salary minimums are R$ 2,000 (internship) / R$ 3,000 (others), and jobs without salary pass (`accept_unknown_salary`).
 - **Sources**: prefer APIs/RSS over HTML scraping. **Do not scrape LinkedIn or Indeed** (they block it and forbid it in their terms). Vagas.com and Infojobs (HTML) were postponed. We Work Remotely was suggested but not implemented.
 - **Gupy**: the listing may return only a summary description; if so, fetch the full description from the job page **only for the finalists** (planned for Part 3). The user asked to read Gupy's developer docs, but that fetch failed and is still pending; field names are unconfirmed.
 - **Remotive**: salary comes as free text in USD/year, so `salary_min/max` stay `None`; do not convert currencies (it would distort the BRL filters).
 - **Distribution (final part)**: make installation on new machines easy (install script and/or Docker).
 - **Communication**: the user prefers short answers and low token usage.
+
+## Database and local installs
+
+Job memory uses **SQLite** (`data/jobs.db`, Python's built-in `sqlite3`), which is just a file and needs no server. Never install a database server on the user's machine; if one is ever needed, run it with Docker.
 
 ## Git workflow
 
@@ -164,14 +169,17 @@ Documentation should be educational and help the developer understand how the pr
 
 The user is developing this project while learning.
 
-Whenever implementing a feature:
+**Plan first, then implement.** Before creating or editing any code, present a short plan and wait for the user's approval:
 
-1. Briefly explain its purpose.
-2. Explain the architectural decision and why it was chosen.
-3. Present the changes made.
-4. Explain how the implementation works.
-5. Report which tests were executed and their results.
-6. Suggest the next step without proceeding to it automatically.
+1. Purpose of the change.
+2. Architectural decision and why it was chosen.
+3. Files that will be created or changed and how the implementation will work.
+4. Tests that will be added or run.
+5. Commit message(s) and, when applicable, the merge title and tag.
+
+Once the user approves the plan, implement it, run the tests, commit and push **without asking for confirmation again** (the approved plan is the authorization, including any merge/tag it lists). If something must deviate from the plan, stop and explain.
+
+After finishing, give a short summary: what was done, test results, commits, branch and push status, and the suggested next step (without starting it).
 
 Avoid excessively long responses and unnecessary token consumption.
 
@@ -232,18 +240,21 @@ Create tags only for stable versions after integration into `main`, not for ever
 
 Never merge into `main`, create tags, or publish releases automatically without explicit user authorization.
 
+Merges into `main` use `git merge --no-ff` with an English title in the format `Part N <name>` (e.g. `Part 3 filters`), consistent with the English commit messages. Always show the merge title to the user before merging; an approved plan containing the title counts as authorization.
+
 ## 8. Mandatory Workflow for Every Development Stage
 
 1. Inspect the current project structure and Git status.
 2. Confirm the correct branch for the requested task.
-3. Implement only the requested stage or feature.
-4. Create or update relevant unit tests.
-5. Update the relevant documentation.
-6. Run the tests.
-7. Review `git diff` and the files that will be committed.
-8. Create a commit following Conventional Commits.
-9. Push the branch to GitHub.
-10. Provide the user with a summary of the changes, tests, commit, branch, and push status.
+3. Present the plan (section 6) and wait for the user's approval.
+4. Implement only the approved stage or feature.
+5. Create or update relevant unit tests.
+6. Update the relevant documentation.
+7. Run the tests.
+8. Review `git diff` and the files that will be committed.
+9. Create a commit following Conventional Commits.
+10. Push the branch to GitHub.
+11. Provide the user with a summary of the changes, tests, commit, branch, and push status.
 
 Never execute destructive commands such as `git reset --hard`, delete branches, or overwrite the user's changes without explicit authorization.
 
