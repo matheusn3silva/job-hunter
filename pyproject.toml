@@ -1,6 +1,6 @@
 [project]
 name = "jobhunter"
-version = "0.1.0"
+version = "0.10.0"
 description = "Busca vagas de desenvolvedor, ranqueia e adapta currículos."
 requires-python = ">=3.11"
 dependencies = [

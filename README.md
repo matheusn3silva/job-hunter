@@ -7,7 +7,31 @@ lembra das vagas já vistas. Tudo gratuito: sem APIs pagas.
 ## Pipeline
 Scrapers → Filtros → Remover já vistas → Ranking → Top N → Prompt de currículo (.txt) → Salvar memória
 
-## Instalação (desenvolvimento)
+## Instalação (Parte 10)
+
+### Linux/macOS (script)
+Requisito: Python 3.11+ e git.
+
+    git clone https://github.com/matheusn3silva/job-hunter.git
+    cd job-hunter
+    ./install.sh            # ou ./install.sh --dev para instalar o pytest e rodar os testes
+    source .venv/bin/activate
+
+O script cria o ambiente virtual `.venv`, instala o projeto e cria as pastas
+`data/resume` e `data/output`. Depois disso, `jobhunter` funciona de qualquer
+pasta (com o ambiente ativado), usando a `config/` do projeto.
+
+### Qualquer sistema (Docker)
+Não precisa de Python instalado; `config/` e `data/` ficam na sua máquina.
+
+    docker compose build
+    docker compose run --rm jobhunter --dry-run   # só o ranking
+    docker compose run --rm jobhunter             # gera os prompts em data/output
+
+O container roda com o seu usuário (`UID`/`GID`), então os arquivos em
+`data/` não ficam do root. No Windows, rode pelo Docker Desktop.
+
+### Manual (desenvolvimento)
     python -m venv .venv && source .venv/bin/activate
     pip install -e ".[dev]"
     pytest

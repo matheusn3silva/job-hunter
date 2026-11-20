@@ -12,13 +12,26 @@ from jobhunter.services import JobHuntPipeline, PipelineResult
 from jobhunter.storage import JobRepository, StorageError
 
 
+def default_config_dir() -> Path:
+    """``./config`` se existir; senão, a pasta ``config`` do projeto instalado.
+
+    Assim ``jobhunter`` funciona de qualquer pasta depois do ``install.sh``
+    (instalação editável aponta para o código do projeto).
+    """
+    local = Path("config")
+    if local.is_dir():
+        return local
+    return Path(__file__).resolve().parents[2] / "config"
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="jobhunter",
         description="Busca vagas, ranqueia pelo seu perfil e gera prompts de currículo para as melhores.",
     )
-    parser.add_argument("--config-dir", type=Path, default=Path("config"),
-                        help="pasta com settings.yaml e sources.yaml (padrão: config)")
+    parser.add_argument("--config-dir", type=Path, default=None,
+                        help="pasta com settings.yaml e sources.yaml "
+                             "(padrão: ./config ou a config do projeto)")
     parser.add_argument("--dry-run", action="store_true",
                         help="só lista o ranking: não gera prompts nem grava na memória")
     parser.add_argument("--top", type=int, metavar="N", help="quantas vagas no top (sobrepõe top_n)")
@@ -93,7 +106,7 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO if args.verbose else logging.ERROR,
                         format="%(levelname)s %(name)s: %(message)s")
     try:
-        settings = load_settings(args.config_dir, args.top)
+        settings = load_settings(args.config_dir or default_config_dir(), args.top)
         with JobRepository(settings.db_path) as repository:
             result = JobHuntPipeline.from_settings(settings, repository).run(dry_run=args.dry_run)
     except (ConfigError, StorageError) as exc:

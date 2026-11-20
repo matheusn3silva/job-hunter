@@ -5,7 +5,7 @@ import pytest
 
 from jobhunter.config import Settings
 from jobhunter.filters import FilterChain
-from jobhunter.main import format_report, load_settings, main
+from jobhunter.main import default_config_dir, format_report, load_settings, main
 from jobhunter.models import Job, SearchCriteria
 from jobhunter.ranking import JobRanker
 from jobhunter.resume import ResumeError, ResumeWriter
@@ -184,3 +184,15 @@ def test_format_report_lists_top_files_and_errors():
                      "Prompts de currículo gerados (1)", "out/cv.md", "memória: 1",
                      "[gupy] falha HTTP"):
         assert expected in text
+
+
+def test_default_config_dir_prefers_local_folder(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "config").mkdir()
+    assert default_config_dir() == Path("config")
+
+
+def test_default_config_dir_falls_back_to_project(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    found = default_config_dir()
+    assert found.name == "config" and (found / "settings.yaml").exists()

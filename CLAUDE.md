@@ -8,15 +8,17 @@ JobHunter finds developer job postings (Java, JavaScript, Python) from free sour
 
 Scrapers → Filters → Drop already-seen → Ranking → Top N → Résumé prompt (.txt) → Save memory
 
-The whole pipeline exists (Parts 1–7): scrapers, filters, seen-jobs storage, ranking, résumé tailoring, the pipeline service and the `jobhunter` CLI. Remaining: Part 8 (easy installation on new machines). There is no CLI entry point yet.
+The project is feature-complete (Parts 1–10): free scrapers, filters, seen-jobs storage, ranking, résumé prompts, the pipeline service, the `jobhunter` CLI, and installation (`install.sh`, Docker). Open issue: the Gupy endpoint returns 404. There is no CLI entry point yet.
 
 Code, docstrings, comments, error messages and the README are written in **Portuguese (pt-BR)**. Keep new code in the same language.
 
 ## Commands
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+./install.sh --dev                       # new machine: venv + editable install + data dirs + tests
+python -m venv .venv && source .venv/bin/activate   # or manually
 pip install -e ".[dev]"
+docker compose run --rm jobhunter --dry-run           # Docker (not tested in this environment: no Docker here)
 
 jobhunter --dry-run                      # real run: scrape, filter, rank (nothing saved)
 jobhunter                                # full run: writes prompt .txt files to data/output and saves memory
@@ -43,7 +45,7 @@ Package lives in `src/jobhunter/` (src layout).
 - **Filters** (`filters/`): `BaseFilter.accepts(job) -> bool`, one class per criterion in `rules.py` (keywords, excluded keywords, seniority by **title + tags** (`Job.headline`), location/remote regions, salary). `FilterChain.from_criteria(criteria)` builds the default chain from `DEFAULT_FILTERS`; `apply(jobs)` keeps jobs approved by every filter and counts discards per filter `name` in `rejected`. Term matching uses `utils.text.contains_term` (whole words).
 - **Ranking** (`ranking/`): same pattern as filters. `BaseScoreRule.score(job)` returns 0..1 and has a `weight`; rules in `ranking/rules.py` (keywords 4, seniority 3, location 1, salary 1, recency 1; unknown info scores 0.5). `JobRanker.from_criteria(criteria, now=None)` combines them as a weighted average scaled to 0..10; `rank(jobs)` returns copies with `score` set, best first (ties: most recent first); `top(jobs)` returns `criteria.top_n`. Seniority logic is shared through `filters.rules.accepted_levels` / `has_accepted_level`.
 - **Pipeline** (`services/pipeline.py`): `JobHuntPipeline` only orchestrates; every stage is injected (`from_settings(settings, repository)` builds the defaults). `run(dry_run=False) -> PipelineResult`. Only jobs whose prompt file was written are marked as seen; per-job `ResumeError`s are collected in `result.errors` and don't stop the loop; an unreadable base résumé only adds a warning (prompts ask the user to attach the PDF).
-- **CLI** (`main.py`, console script `jobhunter`): `--config-dir`, `--dry-run`, `--top N`, `-v`. `load_settings` resolves relative paths against the parent of the config dir (project root). Exit code 1 on `ConfigError`/`StorageError`. Without `-v`, logging is at ERROR so warnings appear only once, in the report.
+- **CLI** (`main.py`, console script `jobhunter`): `--config-dir` (default: `./config` if it exists, else the project's `config/` via `default_config_dir()`), `--dry-run`, `--top N`, `-v`. `load_settings` resolves relative paths against the parent of the config dir (project root). Exit code 1 on `ConfigError`/`StorageError`. Without `-v`, logging is at ERROR so warnings appear only once, in the report.
 - **Résumé** (`resume/`): **zero cost, no paid API** (user decision 2026-11-20). `ResumeReader.read(path)` extracts PDF text with `pypdf`; `ResumePromptBuilder.build(job, resume_text=None)` returns a prompt (rules forbidding invented experience + job data + résumé text, or a request to attach the PDF when the text is missing) that the user pastes into a free chat AI; `ResumeWriter(output_dir).write(job, text, rank)` saves `<rank:02d>_<company>_<title>_<uid>.txt`. Failures become `ResumeError`. The former Anthropic API tailor lives only in git history (tag `v0.7.0`); do not reintroduce paid APIs.
 - **Storage** (`storage/`): `JobRepository(db_path)` (Repository pattern, all SQL lives there) keeps processed jobs in SQLite table `seen_jobs`, keyed by `Job.uid`. `filter_unseen(jobs)` keeps order, `mark_seen(jobs)` uses `INSERT OR IGNORE` and returns how many were new, plus `has_seen`, `count`, `close`/context manager. `":memory:"` works for tests; parent folders are created; `sqlite3` errors become `StorageError`. The caller decides which jobs to mark (planned: only the top N).
 - **`utils.text`**: `contains_term` (whole-word, case-insensitive), `strip_html` (BeautifulSoup) and `parse_datetime` (ISO-8601, always returns tz-aware datetimes, UTC when none given, so dates from different sources can be compared).
@@ -67,7 +69,7 @@ Tests never hit the network. Use the `make_client(payload, status=200)` fixture 
 
 Parts 1 and 2 were designed in a Claude Web chat before moving to Claude Code. Decisions already made there:
 
-- **Planned**: Part 8, install script and/or Docker for new machines.
+- **Installation** (Part 10): `install.sh` (Linux/macOS, checks Python 3.11+, `--dev` also runs tests); `Dockerfile` (python:3.12-slim, `ENTRYPOINT jobhunter`, default `--dry-run`) + `docker-compose.yml` (mounts `./config` read-only and `./data`, runs as host `UID:GID`). Keep `pyproject.toml` `version` in sync with release tags.
 - **Résumé**: the base résumé is a **PDF** (`data/resume/curriculo.pdf`). Tailoring happens in a free chat AI from the generated prompt, **never inventing experience**.
 - **Ranking**: score by keywords / seniority / location; semantic similarity may be added later.
 - **Filters (Part 3, implemented), answered by the user**:
