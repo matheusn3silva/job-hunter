@@ -27,3 +27,17 @@ Scrapers → Filtros → Remover já vistas → Ranking → Top N → Adaptar cu
 
 ## Fluxo de trabalho com git
 Cada parte do projeto = uma branch `parte-N-nome` e um commit/merge ao final.
+
+## Scrapers (Parte 2)
+Cada fonte é uma classe que herda de `BaseScraper` e implementa `_fetch`.
+`ScraperFactory` escolhe a classe pelo `name` da fonte em `sources.yaml`;
+`ScraperRunner` roda todas as fontes ativas, isola falhas (`runner.errors`)
+e remove duplicatas.
+
+Para adicionar um site: crie `scrapers/meusite.py`, registre em
+`ScraperFactory.REGISTRY` e adicione a fonte em `config/sources.yaml`.
+
+| Fonte | Tipo | Observações |
+|---|---|---|
+| gupy | API do portal (não oficial) | 1 requisição por palavra-chave |
+| remotive | API pública | 1 requisição; máx. ~4/dia; vagas com 24h de atraso |"
