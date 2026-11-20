@@ -8,7 +8,7 @@ JobHunter finds developer job postings (Java, JavaScript, Python), filters and r
 
 Scrapers → Filters → Drop already-seen → Ranking → Top N → Tailor résumé → Save memory
 
-Scrapers (Part 2), filters (Part 3), the seen-jobs storage (Part 4) and ranking (Part 5) exist, plus models/config. There is no pipeline service or CLI entry point yet. There is no CLI entry point yet.
+Scrapers (Part 2), filters (Part 3), the seen-jobs storage (Part 4), ranking (Part 5) and résumé tailoring (Part 6) exist, plus models/config. There is no pipeline service or CLI entry point yet. There is no CLI entry point yet.
 
 Code, docstrings, comments, error messages and the README are written in **Portuguese (pt-BR)**. Keep new code in the same language.
 
@@ -39,6 +39,7 @@ Package lives in `src/jobhunter/` (src layout).
   - To add a source: create `scrapers/<site>.py`, register it in `ScraperFactory.REGISTRY`, add an entry to `config/sources.yaml`.
 - **Filters** (`filters/`): `BaseFilter.accepts(job) -> bool`, one class per criterion in `rules.py` (keywords, excluded keywords, seniority by **title only**, location/remote regions, salary). `FilterChain.from_criteria(criteria)` builds the default chain from `DEFAULT_FILTERS`; `apply(jobs)` keeps jobs approved by every filter and counts discards per filter `name` in `rejected`. Term matching uses `utils.text.contains_term` (whole words).
 - **Ranking** (`ranking/`): same pattern as filters. `BaseScoreRule.score(job)` returns 0..1 and has a `weight`; rules in `ranking/rules.py` (keywords 4, seniority 3, location 1, salary 1, recency 1; unknown info scores 0.5). `JobRanker.from_criteria(criteria, now=None)` combines them as a weighted average scaled to 0..10; `rank(jobs)` returns copies with `score` set, best first (ties: most recent first); `top(jobs)` returns `criteria.top_n`. Seniority logic is shared through `filters.rules.accepted_levels` / `has_accepted_level`.
+- **Résumé** (`resume/`): `ResumeReader.read(path)` extracts PDF text with `pypdf`; `ResumeTailor(client=None).tailor(resume_text, job)` calls `client.beta.messages.create` with `claude-opus-5-5`, `effort: high`, server-side refusal fallback (`fallbacks="default"`, beta `server-side-fallback-2026-07-01`) and `cache_control` on the résumé block; the client is created lazily (reads `ANTHROPIC_API_KEY`) and is injectable for tests (tests use a fake with `.beta.messages.create`). `ResumeWriter(output_dir).write(job, md)` saves `<company>_<title>_<uid>.md`. Every failure becomes `ResumeError`. The system prompt forbids inventing experience.
 - **Storage** (`storage/`): `JobRepository(db_path)` (Repository pattern, all SQL lives there) keeps processed jobs in SQLite table `seen_jobs`, keyed by `Job.uid`. `filter_unseen(jobs)` keeps order, `mark_seen(jobs)` uses `INSERT OR IGNORE` and returns how many were new, plus `has_seen`, `count`, `close`/context manager. `":memory:"` works for tests; parent folders are created; `sqlite3` errors become `StorageError`. The caller decides which jobs to mark (planned: only the top N).
 - **`utils.text`**: `contains_term` (whole-word, case-insensitive), `strip_html` (BeautifulSoup) and `parse_datetime` (ISO-8601, always returns tz-aware datetimes, UTC when none given, so dates from different sources can be compared).
 
@@ -58,7 +59,7 @@ Tests never hit the network. Use the `make_client(payload, status=200)` fixture 
 
 Parts 1 and 2 were designed in a Claude Web chat before moving to Claude Code. Decisions already made there:
 
-- **Planned modules** (not created yet): `resume/`, `services/` (pipeline orchestration) and `main.py`. Each pipeline stage is its own class.
+- **Planned modules** (not created yet): `services/` (pipeline orchestration) and `main.py`. Each pipeline stage is its own class.
 - **Résumé**: the base résumé is a **PDF** (`data/resume/curriculo.pdf`). Tailored résumés will be generated with the Anthropic API from the job description + base résumé, **never inventing experience**.
 - **Ranking**: score by keywords / seniority / location; semantic similarity may be added later.
 - **Filters (Part 3, implemented), answered by the user**:

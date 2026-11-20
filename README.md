@@ -97,3 +97,25 @@ avaliando um aspecto de 0 a 1:
 
 Empates: a vaga mais recente vem primeiro. Para mudar a importância de um
 aspecto, altere o `weight` da regra em `ranking/rules.py`.
+
+## Currículo (Parte 6)
+O módulo `resume` tem três classes, cada uma com uma responsabilidade:
+
+| Classe | Papel |
+|---|---|
+| `ResumeReader` | Extrai o texto do seu PDF (`pypdf`). PDF escaneado (só imagem) gera erro claro |
+| `ResumeTailor` | Pede ao Claude (`claude-opus-5-5`) uma versão do currículo para a vaga |
+| `ResumeWriter` | Salva em `data/output/<empresa>_<titulo>_<uid>.md` |
+
+Regras dadas à IA: **nunca inventar** experiências, empresas, datas ou
+habilidades; só reordenar, reescrever e destacar o que já está no currículo,
+no idioma da vaga. Revise sempre o resultado antes de enviar.
+
+Configuração da API: crie uma chave em console.anthropic.com e exporte
+`ANTHROPIC_API_KEY` (ou use `ant auth login`). Nunca coloque a chave no
+código nem no git (`.env` já é ignorado). Cada vaga adaptada é uma chamada
+paga; o texto do currículo vai com cache para baratear as chamadas seguintes.
+Se o modelo recusar um pedido, o servidor tenta outro modelo automaticamente
+(`fallbacks: "default"`).
+
+Erros (arquivo, chave, limite de uso, rede, recusa) viram `ResumeError`.
