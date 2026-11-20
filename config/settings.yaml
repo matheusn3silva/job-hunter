@@ -1,0 +1,15 @@
+criteria:
+  keywords: [java, javascript, python, spring, react, node, django, fastapi]
+  excluded_keywords: [sênior, senior, especialista, tech lead, php, ".net"]
+  seniority: [estágio, estagiário, júnior, junior, pleno]
+  locations: [São Paulo]
+  remote_only: false
+  min_salary: 3000              # R$/mês (júnior e pleno)
+  min_salary_internship: 2000   # R$/mês (estágio)
+  accept_unknown_salary: true
+  top_n: 10
+
+paths:
+  resume: data/resume/curriculo.pdf
+  output: data/output
+  database: data/jobs.db

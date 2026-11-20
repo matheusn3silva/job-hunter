@@ -1,0 +1,6 @@
+# URLs reais serão definidas na Parte 2, junto com os scrapers.
+sources:
+  - name: exemplo-fonte
+    type: html        # html | rss | api
+    url: https://exemplo.com/vagas?q=python
+    enabled: false

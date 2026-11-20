@@ -1,0 +1,1 @@
+"""JobHunter: busca, ranqueia vagas e adapta currículos."""
