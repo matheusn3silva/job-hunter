@@ -30,8 +30,8 @@ def accepted_levels(criteria: SearchCriteria) -> list[str]:
 
 
 def has_accepted_level(job: Job, criteria: SearchCriteria) -> bool:
-    """True se o título da vaga cita um dos níveis aceitos."""
-    return any(contains_term(job.title, level) for level in accepted_levels(criteria))
+    """True se o título ou as tags da vaga citam um dos níveis aceitos."""
+    return any(contains_term(job.headline, level) for level in accepted_levels(criteria))
 
 
 class KeywordFilter(BaseFilter):
@@ -54,7 +54,7 @@ class ExcludedKeywordFilter(BaseFilter):
     """Descarta a vaga se ela citar qualquer termo excluído (ex.: "php").
 
     Termos de senioridade (ex.: "sênior", "tech lead") são procurados só no
-    título: uma vaga júnior que diga "mentoria de devs sênior" na descrição
+    título e nas tags (``Job.headline``): uma vaga júnior que diga "mentoria de devs sênior" na descrição
     não deve ser descartada. Os demais termos valem para o texto inteiro.
     """
 
@@ -62,7 +62,7 @@ class ExcludedKeywordFilter(BaseFilter):
 
     def accepts(self, job: Job) -> bool:
         for term in self.criteria.excluded_keywords:
-            text = job.title if term in KNOWN_SENIORITY_LEVELS else job.searchable_text
+            text = job.headline if term in KNOWN_SENIORITY_LEVELS else job.searchable_text
             if contains_term(text, term):
                 return False
         return True
@@ -71,7 +71,7 @@ class ExcludedKeywordFilter(BaseFilter):
 class SeniorityFilter(BaseFilter):
     """Mantém vagas do nível desejado ou sem nível informado.
 
-    Olha só o título: descrições costumam citar vários níveis ("você vai
+    Olha título e tags (``Job.headline``), não a descrição: descrições costumam citar vários níveis ("você vai
     trabalhar com devs sêniores"), o que geraria falsos descartes.
 
     - Título cita um nível aceito → aceita.
@@ -87,10 +87,9 @@ class SeniorityFilter(BaseFilter):
     def accepts(self, job: Job) -> bool:
         if not self.criteria.seniority:
             return True
-        title = job.title
         if has_accepted_level(job, self.criteria):
             return True
-        return not any(contains_term(title, level) for level in KNOWN_SENIORITY_LEVELS)
+        return not any(contains_term(job.headline, level) for level in KNOWN_SENIORITY_LEVELS)
 
 
 class LocationFilter(BaseFilter):

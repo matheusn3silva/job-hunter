@@ -54,3 +54,9 @@ class BaseScraper(ABC):
         response = self._client.get(url, params=params)
         response.raise_for_status()
         return response.json()
+
+    def _get_text(self, url: str, params: dict[str, Any] | None = None) -> str:
+        """GET que devolve o corpo como texto (RSS/HTML); erro para 4xx/5xx."""
+        response = self._client.get(url, params=params)
+        response.raise_for_status()
+        return response.text

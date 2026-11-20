@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 
 from bs4 import BeautifulSoup
 
@@ -14,7 +15,7 @@ def strip_html(html: str | None) -> str:
 
 
 def parse_datetime(value: str | None) -> datetime | None:
-    """Converte data ISO-8601 em datetime com fuso (UTC se vier sem fuso).
+    """Converte data ISO-8601 ou de RSS (RFC 822) em datetime com fuso (UTC se vier sem).
 
     Retorna None se o valor for vazio ou inválido. Padronizar o fuso evita
     erro ao comparar datas de fontes diferentes na hora de ordenar.
@@ -24,7 +25,10 @@ def parse_datetime(value: str | None) -> datetime | None:
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
-        return None
+        try:  # formato de RSS: "Sun, 01 Nov 2026 07:31:04 +0000"
+            parsed = parsedate_to_datetime(value)
+        except (TypeError, ValueError):
+            return None
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 

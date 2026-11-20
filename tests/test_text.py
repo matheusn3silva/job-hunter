@@ -36,3 +36,8 @@ def test_parse_datetime_invalid():
 ])
 def test_contains_term(text, term, expected):
     assert contains_term(text, term) is expected
+
+
+def test_parse_datetime_rss_format():
+    parsed = parse_datetime("Sun, 01 Nov 2026 07:31:04 +0000")
+    assert (parsed.year, parsed.month, parsed.day) == (2026, 11, 1) and parsed.tzinfo

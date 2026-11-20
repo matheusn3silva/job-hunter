@@ -55,12 +55,22 @@ class Job:
         return " ".join([self.title, self.description, *self.tags]).lower()
 
     @property
+    def headline(self) -> str:
+        """Título + tags: onde as fontes informam o nível da vaga.
+
+        Algumas fontes põem o nível só em etiquetas (ex.: issue do GitHub com
+        a etiqueta "Sênior"); a descrição fica de fora porque costuma citar
+        vários níveis ("mentoria de devs sêniores").
+        """
+        return " ".join([self.title, *self.tags])
+
+    @property
     def is_internship(self) -> bool:
-        """True se o título indica estágio.
+        """True se o título ou as tags indicam estágio.
 
         Compara palavras inteiras: "Internal Tools" não é estágio.
         """
-        return any(contains_term(self.title, marker) for marker in INTERNSHIP_MARKERS)
+        return any(contains_term(self.headline, marker) for marker in INTERNSHIP_MARKERS)
 
     def with_score(self, score: float) -> Job:
         """Retorna uma cópia da vaga com a pontuação definida."""
