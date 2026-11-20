@@ -1,6 +1,8 @@
 from datetime import timezone
 
-from jobhunter.utils.text import parse_datetime, strip_html
+import pytest
+
+from jobhunter.utils.text import contains_term, parse_datetime, strip_html
 
 
 def test_strip_html():
@@ -22,3 +24,15 @@ def test_parse_datetime_naive_becomes_utc():
 def test_parse_datetime_invalid():
     assert parse_datetime("ontem") is None
     assert parse_datetime(None) is None
+
+@pytest.mark.parametrize("text, term, expected", [
+    ("Vaga Python e Django", "python", True),
+    ("Dev JavaScript", "java", False),
+    ("Projeto em ASP.NET", ".net", True),
+    ("Node.js no backend", "node", True),
+    ("Plano de seniority", "senior", False),
+    ("Tech Lead de squad", "tech lead", True),
+    ("qualquer coisa", "", False),
+])
+def test_contains_term(text, term, expected):
+    assert contains_term(text, term) is expected

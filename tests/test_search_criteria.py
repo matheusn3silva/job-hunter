@@ -26,3 +26,7 @@ def test_min_salary_for_picks_right_value():
     c = SearchCriteria(min_salary=3000, min_salary_internship=2000)
     assert c.min_salary_for(is_internship=True) == 2000
     assert c.min_salary_for(is_internship=False) == 3000
+
+def test_remote_regions_have_defaults_and_are_normalized():
+    assert "worldwide" in SearchCriteria().remote_regions
+    assert SearchCriteria(remote_regions=[" LATAM "]).remote_regions == ["latam"]

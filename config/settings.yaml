@@ -1,9 +1,10 @@
 criteria:
   keywords: [java, javascript, python, spring, react, node, django, fastapi]
   excluded_keywords: [sênior, senior, especialista, tech lead, php, ".net"]
-  seniority: [estágio, estagiário, júnior, junior, pleno]
+  seniority: [estágio, estagiário, júnior, junior, jr, pleno, mid-level]
   locations: [São Paulo]
   remote_only: false
+  remote_regions: [worldwide, anywhere, global, latam, latin america, south america, americas, brazil, brasil]
   min_salary: 3000              # R$/mês (júnior e pleno)
   min_salary_internship: 2000   # R$/mês (estágio)
   accept_unknown_salary: true

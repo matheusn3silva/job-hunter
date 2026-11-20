@@ -19,7 +19,7 @@ def test_parses_job_fields(make_client):
     assert job.title == "Desenvolvedor Python Júnior"
     assert job.company == "Acme"
     assert job.description == "Django"
-    assert job.location == "São Paulo, SP"
+    assert job.location == "São Paulo, SP, Brasil"
     assert job.remote is True
     assert job.source == "gupy"
     assert job.posted_at is not None

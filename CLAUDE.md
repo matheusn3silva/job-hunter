@@ -8,7 +8,7 @@ JobHunter finds developer job postings (Java, JavaScript, Python), filters and r
 
 Scrapers → Filters → Drop already-seen → Ranking → Top N → Tailor résumé → Save memory
 
-Only the first stage (scrapers) plus models/config exist so far. There is no CLI entry point yet.
+Scrapers (Part 2) and filters (Part 3) exist, plus models/config. There is no CLI entry point yet.
 
 Code, docstrings, comments, error messages and the README are written in **Portuguese (pt-BR)**. Keep new code in the same language.
 
@@ -37,10 +37,11 @@ Package lives in `src/jobhunter/` (src layout).
   - `ScraperFactory.REGISTRY` maps the source's `name` (not `type`) in `sources.yaml` to a scraper class.
   - `ScraperRunner.run(criteria)` runs every source, logs failures into `runner.errors` without aborting the others, and dedups by `uid`.
   - To add a source: create `scrapers/<site>.py`, register it in `ScraperFactory.REGISTRY`, add an entry to `config/sources.yaml`.
-- **`utils.text`**: `strip_html` (BeautifulSoup) and `parse_datetime` (ISO-8601, always returns tz-aware datetimes, UTC when none given, so dates from different sources can be compared).
+- **Filters** (`filters/`): `BaseFilter.accepts(job) -> bool`, one class per criterion in `rules.py` (keywords, excluded keywords, seniority by **title only**, location/remote regions, salary). `FilterChain.from_criteria(criteria)` builds the default chain from `DEFAULT_FILTERS`; `apply(jobs)` keeps jobs approved by every filter and counts discards per filter `name` in `rejected`. Term matching uses `utils.text.contains_term` (whole words).
+- **`utils.text`**: `contains_term` (whole-word, case-insensitive), `strip_html` (BeautifulSoup) and `parse_datetime` (ISO-8601, always returns tz-aware datetimes, UTC when none given, so dates from different sources can be compared).
 
 Source-specific constraints that shape the code:
-- **gupy**: unofficial portal API; one request per keyword (empty term if no keywords), results merged by `uid`. Items missing title or URL are skipped.
+- **gupy**: unofficial portal API; `location` is `city, state, country` (country defaults to "Brasil", so the location filter accepts remote Gupy jobs); one request per keyword (empty term if no keywords), results merged by `uid`. Items missing title or URL are skipped.
 - **remotive**: public API with a tight rate limit (~4 calls/day) and 24h delay. It makes **one** request for the whole `software-dev` category and leaves keyword filtering to the filter stage. Job links must point to Remotive (terms of use). `candidate_required_location` becomes `location` so the location filter can drop country-restricted postings.
 
 ## Testing
@@ -55,13 +56,13 @@ Tests never hit the network. Use the `make_client(payload, status=200)` fixture 
 
 Parts 1 and 2 were designed in a Claude Web chat before moving to Claude Code. Decisions already made there:
 
-- **Planned modules** (not created yet): `filters/`, `ranking/`, `resume/`, `storage/` (SQLite "seen" repository), `services/` (pipeline orchestration) and `main.py`. Each pipeline stage is its own class.
+- **Planned modules** (not created yet): `ranking/`, `resume/`, `storage/` (SQLite "seen" repository), `services/` (pipeline orchestration) and `main.py`. Each pipeline stage is its own class.
 - **Résumé**: the base résumé is a **PDF** (`data/resume/curriculo.pdf`). Tailored résumés will be generated with the Anthropic API from the job description + base résumé, **never inventing experience**.
 - **Ranking**: score by keywords / seniority / location; semantic similarity may be added later.
-- **Filters (Part 3), answered by the user**:
+- **Filters (Part 3, implemented), answered by the user**:
   - Jobs that don't mention a seniority level (e.g. "Desenvolvedor Python") are **kept**; ranking gives them a lower score.
   - Remote jobs restricted to other countries (e.g. "USA Only") are **removed**; accept only Worldwide, LATAM and Brazil.
-  - A job is an internship when its title contains "estágio", "estagiário" or "intern" (`Job.is_internship`); salary minimums are R$ 2,000 (internship) / R$ 3,000 (others), and jobs without salary pass (`accept_unknown_salary`).
+  - A job is an internship when its title contains "estágio", "estagiário" or "intern" (`Job.is_internship`, plain substring match); salary minimums are R$ 2,000 (internship) / R$ 3,000 (others), and jobs without salary pass (`accept_unknown_salary`).
 - **Sources**: prefer APIs/RSS over HTML scraping. **Do not scrape LinkedIn or Indeed** (they block it and forbid it in their terms). Vagas.com and Infojobs (HTML) were postponed. We Work Remotely was suggested but not implemented.
 - **Gupy**: the listing may return only a summary description; if so, fetch the full description from the job page **only for the finalists** (planned for Part 3). The user asked to read Gupy's developer docs, but that fetch failed and is still pending; field names are unconfirmed.
 - **Remotive**: salary comes as free text in USD/year, so `salary_min/max` stay `None`; do not convert currencies (it would distort the BRL filters).

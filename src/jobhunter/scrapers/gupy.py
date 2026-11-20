@@ -37,7 +37,10 @@ class GupyScraper(BaseScraper):
         if not title or not url:
             return None
         workplace = (item.get("workplaceType") or "").lower()
-        location = ", ".join(p for p in (item.get("city"), item.get("state")) if p)
+        # A Gupy é um portal brasileiro: sem país informado, assume Brasil. Isso
+        # permite ao filtro de localização aceitar vagas remotas daqui.
+        country = item.get("country") or "Brasil"
+        location = ", ".join(p for p in (item.get("city"), item.get("state"), country) if p)
         return Job(
             title=title,
             company=item.get("careerPageName") or "",
