@@ -6,7 +6,11 @@ import hashlib
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 
-INTERNSHIP_MARKERS = ("estágio", "estagio", "estagiário", "estagiario", "intern")
+from jobhunter.utils.text import contains_term
+
+INTERNSHIP_MARKERS = (
+    "estágio", "estagio", "estagiário", "estagiario", "intern", "internship",
+)
 
 
 @dataclass(frozen=True)
@@ -52,9 +56,11 @@ class Job:
 
     @property
     def is_internship(self) -> bool:
-        """True se o título indica estágio."""
-        title = self.title.lower()
-        return any(marker in title for marker in INTERNSHIP_MARKERS)
+        """True se o título indica estágio.
+
+        Compara palavras inteiras: "Internal Tools" não é estágio.
+        """
+        return any(contains_term(self.title, marker) for marker in INTERNSHIP_MARKERS)
 
     def with_score(self, score: float) -> Job:
         """Retorna uma cópia da vaga com a pontuação definida."""

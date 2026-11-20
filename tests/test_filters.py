@@ -47,6 +47,18 @@ def test_excluded_keyword_rejects(text):
     assert not f.accepts(make_job(description=text))
 
 
+def test_excluded_seniority_term_only_checks_title():
+    f = ExcludedKeywordFilter(SearchCriteria(excluded_keywords=["sênior", "tech lead"]))
+    assert f.accepts(make_job(description="Mentoria de devs sênior e do tech lead"))
+    assert not f.accepts(make_job(title="Desenvolvedor Sênior"))
+    assert not f.accepts(make_job(title="Tech Lead Python"))
+
+
+def test_excluded_non_seniority_term_checks_description():
+    f = ExcludedKeywordFilter(SearchCriteria(excluded_keywords=["sênior", "php"]))
+    assert not f.accepts(make_job(description="Legado em PHP"))
+
+
 def test_excluded_keyword_ignores_partial_words():
     f = ExcludedKeywordFilter(SearchCriteria(excluded_keywords=["senior"]))
     assert f.accepts(make_job(description="Plano de seniority claro"))

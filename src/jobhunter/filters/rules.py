@@ -12,7 +12,8 @@ from jobhunter.utils.text import contains_term
 KNOWN_SENIORITY_LEVELS = (
     "estágio", "estagio", "estagiário", "estagiario", "intern", "internship",
     "trainee", "júnior", "junior", "jr", "pleno", "mid-level", "sênior",
-    "senior", "sr", "especialista", "staff", "principal", "lead", "líder",
+    "senior", "sr", "especialista", "staff", "principal", "lead", "tech lead",
+    "líder",
 )
 
 
@@ -33,13 +34,21 @@ class KeywordFilter(BaseFilter):
 
 
 class ExcludedKeywordFilter(BaseFilter):
-    """Descarta a vaga se ela citar qualquer termo excluído (ex.: "php")."""
+    """Descarta a vaga se ela citar qualquer termo excluído (ex.: "php").
+
+    Termos de senioridade (ex.: "sênior", "tech lead") são procurados só no
+    título: uma vaga júnior que diga "mentoria de devs sênior" na descrição
+    não deve ser descartada. Os demais termos valem para o texto inteiro.
+    """
 
     name = "excluded_keywords"
 
     def accepts(self, job: Job) -> bool:
-        text = job.searchable_text
-        return not any(contains_term(text, kw) for kw in self.criteria.excluded_keywords)
+        for term in self.criteria.excluded_keywords:
+            text = job.title if term in KNOWN_SENIORITY_LEVELS else job.searchable_text
+            if contains_term(text, term):
+                return False
+        return True
 
 
 class SeniorityFilter(BaseFilter):

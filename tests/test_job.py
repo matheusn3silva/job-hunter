@@ -40,5 +40,7 @@ def test_is_internship_true(title):
     assert make_job(title=title).is_internship
 
 
-def test_is_internship_false():
-    assert not make_job(title="Desenvolvedor Júnior").is_internship
+@pytest.mark.parametrize("title", ["Desenvolvedor Júnior", "Internal Tools Developer",
+                                   "International Sales Engineer"])
+def test_is_internship_false(title):
+    assert not make_job(title=title).is_internship
