@@ -11,6 +11,14 @@ Scrapers → Filtros → Remover já vistas → Ranking → Top N → Adaptar cu
     pip install -e ".[dev]"
     pytest
 
+## Uso
+    jobhunter --dry-run        # busca, filtra e mostra o ranking (sem IA, sem gravar)
+    jobhunter                  # gera os currículos do top N e salva na memória
+    jobhunter --top 5 -v       # top 5, com logs detalhados
+
+Para gerar currículos é preciso `ANTHROPIC_API_KEY` (veja a Parte 6) e o
+seu currículo em `data/resume/curriculo.pdf`.
+
 ## Configuração
 - `config/settings.yaml`: seus critérios (stack, senioridade, salário, local).
   - `min_salary`: mínimo para júnior/pleno. `min_salary_internship`: mínimo para estágio.
@@ -119,3 +127,21 @@ Se o modelo recusar um pedido, o servidor tenta outro modelo automaticamente
 (`fallbacks: "default"`).
 
 Erros (arquivo, chave, limite de uso, rede, recusa) viram `ResumeError`.
+
+## Pipeline e CLI (Parte 7)
+`services.JobHuntPipeline` só coordena as etapas; cada uma é feita pela classe
+responsável, recebida no construtor (os testes trocam qualquer peça por uma
+falsa):
+
+    ScraperRunner → FilterChain → JobRepository.filter_unseen → JobRanker.top
+    → ResumeReader/ResumeTailor/ResumeWriter → JobRepository.mark_seen
+
+- `run(dry_run=True)` para antes da IA e não grava nada.
+- Só vagas com currículo gerado vão para a memória: se a API falhar em uma
+  vaga, ela volta na próxima execução; a falha de uma não interrompe as outras.
+- O resultado (`PipelineResult`) traz contagens, descartes por filtro, top N,
+  arquivos gerados e avisos, que a CLI (`main.py`) imprime como relatório.
+- Caminhos do `settings.yaml` são relativos à raiz do projeto (pasta acima de
+  `--config-dir`), então o comando funciona de qualquer pasta.
+
+Códigos de saída: `0` ok; `1` erro de configuração ou de memória.
