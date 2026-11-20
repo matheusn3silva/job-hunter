@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-JobHunter finds developer job postings (Java, JavaScript, Python), filters and ranks them against the user's profile, tailors the résumé for the top N, and remembers postings already seen. The planned pipeline:
+JobHunter finds developer job postings (Java, JavaScript, Python) from free sources, filters and ranks them against the user's profile, writes a résumé-tailoring prompt (.txt) for the top N to paste into a free chat AI, and remembers postings already seen. The whole project must stay free of cost. The planned pipeline:
 
-Scrapers → Filters → Drop already-seen → Ranking → Top N → Tailor résumé → Save memory
+Scrapers → Filters → Drop already-seen → Ranking → Top N → Résumé prompt (.txt) → Save memory
 
 The whole pipeline exists (Parts 1–7): scrapers, filters, seen-jobs storage, ranking, résumé tailoring, the pipeline service and the `jobhunter` CLI. Remaining: Part 8 (easy installation on new machines). There is no CLI entry point yet.
 
@@ -18,8 +18,8 @@ Code, docstrings, comments, error messages and the README are written in **Portu
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
-jobhunter --dry-run                      # real run: scrape, filter, rank (no AI, nothing saved)
-jobhunter                                # full run (needs ANTHROPIC_API_KEY and data/resume/curriculo.pdf)
+jobhunter --dry-run                      # real run: scrape, filter, rank (nothing saved)
+jobhunter                                # full run: writes prompt .txt files to data/output and saves memory
 
 pytest                                   # all tests
 pytest tests/test_gupy.py                # one file
@@ -42,9 +42,9 @@ Package lives in `src/jobhunter/` (src layout).
   - To add a source: create `scrapers/<site>.py`, register it in `ScraperFactory.REGISTRY`, add an entry to `config/sources.yaml`.
 - **Filters** (`filters/`): `BaseFilter.accepts(job) -> bool`, one class per criterion in `rules.py` (keywords, excluded keywords, seniority by **title + tags** (`Job.headline`), location/remote regions, salary). `FilterChain.from_criteria(criteria)` builds the default chain from `DEFAULT_FILTERS`; `apply(jobs)` keeps jobs approved by every filter and counts discards per filter `name` in `rejected`. Term matching uses `utils.text.contains_term` (whole words).
 - **Ranking** (`ranking/`): same pattern as filters. `BaseScoreRule.score(job)` returns 0..1 and has a `weight`; rules in `ranking/rules.py` (keywords 4, seniority 3, location 1, salary 1, recency 1; unknown info scores 0.5). `JobRanker.from_criteria(criteria, now=None)` combines them as a weighted average scaled to 0..10; `rank(jobs)` returns copies with `score` set, best first (ties: most recent first); `top(jobs)` returns `criteria.top_n`. Seniority logic is shared through `filters.rules.accepted_levels` / `has_accepted_level`.
-- **Pipeline** (`services/pipeline.py`): `JobHuntPipeline` only orchestrates; every stage is injected (`from_settings(settings, repository)` builds the defaults). `run(dry_run=False) -> PipelineResult`. Only jobs whose résumé was written are marked as seen; per-job `ResumeError`s are collected in `result.errors` and don't stop the loop; an unreadable base résumé skips tailoring and saves nothing.
+- **Pipeline** (`services/pipeline.py`): `JobHuntPipeline` only orchestrates; every stage is injected (`from_settings(settings, repository)` builds the defaults). `run(dry_run=False) -> PipelineResult`. Only jobs whose prompt file was written are marked as seen; per-job `ResumeError`s are collected in `result.errors` and don't stop the loop; an unreadable base résumé only adds a warning (prompts ask the user to attach the PDF).
 - **CLI** (`main.py`, console script `jobhunter`): `--config-dir`, `--dry-run`, `--top N`, `-v`. `load_settings` resolves relative paths against the parent of the config dir (project root). Exit code 1 on `ConfigError`/`StorageError`. Without `-v`, logging is at ERROR so warnings appear only once, in the report.
-- **Résumé** (`resume/`): `ResumeReader.read(path)` extracts PDF text with `pypdf`; `ResumeTailor(client=None).tailor(resume_text, job)` calls `client.beta.messages.create` with `claude-opus-5-5`, `effort: high`, server-side refusal fallback (`fallbacks="default"`, beta `server-side-fallback-2026-07-01`) and `cache_control` on the résumé block; the client is created lazily (reads `ANTHROPIC_API_KEY`) and is injectable for tests (tests use a fake with `.beta.messages.create`). `ResumeWriter(output_dir).write(job, md)` saves `<company>_<title>_<uid>.md`. Every failure becomes `ResumeError`. The system prompt forbids inventing experience.
+- **Résumé** (`resume/`): **zero cost, no paid API** (user decision 2026-11-20). `ResumeReader.read(path)` extracts PDF text with `pypdf`; `ResumePromptBuilder.build(job, resume_text=None)` returns a prompt (rules forbidding invented experience + job data + résumé text, or a request to attach the PDF when the text is missing) that the user pastes into a free chat AI; `ResumeWriter(output_dir).write(job, text, rank)` saves `<rank:02d>_<company>_<title>_<uid>.txt`. Failures become `ResumeError`. The former Anthropic API tailor lives only in git history (tag `v0.7.0`); do not reintroduce paid APIs.
 - **Storage** (`storage/`): `JobRepository(db_path)` (Repository pattern, all SQL lives there) keeps processed jobs in SQLite table `seen_jobs`, keyed by `Job.uid`. `filter_unseen(jobs)` keeps order, `mark_seen(jobs)` uses `INSERT OR IGNORE` and returns how many were new, plus `has_seen`, `count`, `close`/context manager. `":memory:"` works for tests; parent folders are created; `sqlite3` errors become `StorageError`. The caller decides which jobs to mark (planned: only the top N).
 - **`utils.text`**: `contains_term` (whole-word, case-insensitive), `strip_html` (BeautifulSoup) and `parse_datetime` (ISO-8601, always returns tz-aware datetimes, UTC when none given, so dates from different sources can be compared).
 
@@ -68,7 +68,7 @@ Tests never hit the network. Use the `make_client(payload, status=200)` fixture 
 Parts 1 and 2 were designed in a Claude Web chat before moving to Claude Code. Decisions already made there:
 
 - **Planned**: Part 8, install script and/or Docker for new machines.
-- **Résumé**: the base résumé is a **PDF** (`data/resume/curriculo.pdf`). Tailored résumés will be generated with the Anthropic API from the job description + base résumé, **never inventing experience**.
+- **Résumé**: the base résumé is a **PDF** (`data/resume/curriculo.pdf`). Tailoring happens in a free chat AI from the generated prompt, **never inventing experience**.
 - **Ranking**: score by keywords / seniority / location; semantic similarity may be added later.
 - **Filters (Part 3, implemented), answered by the user**:
   - Jobs that don't mention a seniority level (e.g. "Desenvolvedor Python") are **kept**; ranking gives them a lower score.

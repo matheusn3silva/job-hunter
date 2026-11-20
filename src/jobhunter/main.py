@@ -15,12 +15,12 @@ from jobhunter.storage import JobRepository, StorageError
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="jobhunter",
-        description="Busca vagas, ranqueia pelo seu perfil e adapta o currículo para as melhores.",
+        description="Busca vagas, ranqueia pelo seu perfil e gera prompts de currículo para as melhores.",
     )
     parser.add_argument("--config-dir", type=Path, default=Path("config"),
                         help="pasta com settings.yaml e sources.yaml (padrão: config)")
     parser.add_argument("--dry-run", action="store_true",
-                        help="só lista o ranking: não chama a IA nem grava na memória")
+                        help="só lista o ranking: não gera prompts nem grava na memória")
     parser.add_argument("--top", type=int, metavar="N", help="quantas vagas no top (sobrepõe top_n)")
     parser.add_argument("-v", "--verbose", action="store_true", help="mostra logs detalhados")
     return parser
@@ -72,11 +72,11 @@ def format_report(result: PipelineResult, dry_run: bool) -> str:
             lines.append(f"     {job.url}")
     if result.files:
         lines.append("")
-        lines.append(f"Currículos gerados ({len(result.files)}):")
+        lines.append(f"Prompts de currículo gerados ({len(result.files)}) — cole numa IA de chat gratuita:")
         lines.extend(f"  {path}" for path in result.files)
     if dry_run:
         lines.append("")
-        lines.append("Modo --dry-run: nenhum currículo gerado e nada salvo na memória.")
+        lines.append("Modo --dry-run: nenhum prompt gerado e nada salvo na memória.")
     elif result.top:
         lines.append(f"Vagas salvas na memória: {result.saved}")
     if result.errors:

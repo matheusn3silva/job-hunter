@@ -1,11 +1,7 @@
-from types import SimpleNamespace
-
-import anthropic
-import httpx2
 import pytest
 
 from jobhunter.models import Job
-from jobhunter.resume import ResumeError, ResumeReader, ResumeTailor, ResumeWriter
+from jobhunter.resume import ResumeError, ResumePromptBuilder, ResumeReader, ResumeWriter
 from jobhunter.resume.writer import slugify
 
 JOB = Job(title="Desenvolvedor Python Júnior", company="Açaí Tech", url="https://x/1",
@@ -61,67 +57,26 @@ def test_pdf_without_text(tmp_path):
         ResumeReader().read(pdf)
 
 
-# --- ResumeTailor ------------------------------------------------------------
+# --- ResumePromptBuilder -----------------------------------------------------
 
-class FakeClient:
-    """Imita ``anthropic.Anthropic``: guarda a chamada e devolve uma resposta pronta."""
-
-    def __init__(self, response=None, error=None):
-        self.calls = []
-        self._response, self._error = response, error
-        self.beta = SimpleNamespace(messages=SimpleNamespace(create=self._create))
-
-    def _create(self, **kwargs):
-        self.calls.append(kwargs)
-        if self._error:
-            raise self._error
-        return self._response
+def test_prompt_has_rules_job_and_resume():
+    prompt = ResumePromptBuilder().build(JOB, "Fulano - Python, Django")
+    assert "NUNCA invente" in prompt
+    for expected in ("Desenvolvedor Python Júnior", "Açaí Tech", "https://x/1",
+                     "Django e APIs REST", "Fulano - Python, Django"):
+        assert expected in prompt
+    assert prompt.index("=== VAGA ===") < prompt.index("=== MEU CURRÍCULO ===")
 
 
-def reply(*texts, stop_reason="end_turn"):
-    blocks = [SimpleNamespace(type="thinking", thinking="")]
-    blocks += [SimpleNamespace(type="text", text=t) for t in texts]
-    return SimpleNamespace(content=blocks, stop_reason=stop_reason)
+@pytest.mark.parametrize("resume", [None, "   "])
+def test_prompt_without_resume_asks_to_attach(resume):
+    assert "anexado a esta conversa" in ResumePromptBuilder().build(JOB, resume)
 
 
-def test_tailor_sends_resume_and_job_and_returns_text():
-    client = FakeClient(reply("# Fulano\n", "Dev Python"))
-    result = ResumeTailor(client).tailor("Fulano - Python, Django", JOB)
-    assert result == "# Fulano\nDev Python"
-    call = client.calls[0]
-    assert call["model"] == "claude-opus-5-5"
-    assert "NUNCA invente" in call["system"]
-    resume_block, job_block = call["messages"][0]["content"]
-    assert "Python, Django" in resume_block["text"]
-    assert resume_block["cache_control"] == {"type": "ephemeral"}
-    assert "Django e APIs REST" in job_block["text"] and "Açaí Tech" in job_block["text"]
-    assert call["fallbacks"] == "default"
-
-
-def test_refusal_raises():
-    with pytest.raises(ResumeError, match="recusou"):
-        ResumeTailor(FakeClient(reply("", stop_reason="refusal"))).tailor("cv", JOB)
-
-
-def test_empty_answer_raises():
-    with pytest.raises(ResumeError, match="vazia"):
-        ResumeTailor(FakeClient(reply("   "))).tailor("cv", JOB)
-
-
-def _status_error(cls, status):
-    request = httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
-    return cls("erro", response=httpx2.Response(status, request=request), body=None)
-
-
-@pytest.mark.parametrize("error, message", [
-    (_status_error(anthropic.AuthenticationError, 401), "ANTHROPIC_API_KEY"),
-    (_status_error(anthropic.RateLimitError, 429), "Limite"),
-    (_status_error(anthropic.InternalServerError, 500), "500"),
-    (anthropic.APIConnectionError(request=httpx2.Request("POST", "https://x")), "conexão"),
-])
-def test_api_errors_become_resume_error(error, message):
-    with pytest.raises(ResumeError, match=message):
-        ResumeTailor(FakeClient(error=error)).tailor("cv", JOB)
+def test_prompt_marks_remote_and_missing_fields():
+    job = Job(title="Dev", company="", url="https://x/2", description="", source="t", remote=True)
+    prompt = ResumePromptBuilder().build(job, "cv")
+    assert "(remota)" in prompt and "não informada" in prompt and "sem descrição" in prompt
 
 
 # --- ResumeWriter ------------------------------------------------------------
@@ -132,13 +87,12 @@ def test_slugify():
     assert len(slugify("x" * 100)) <= 40
 
 
-def test_writer_saves_markdown_with_job_header(tmp_path):
+def test_writer_saves_txt_named_by_rank(tmp_path):
     out = tmp_path / "saida"
-    path = ResumeWriter(out).write(JOB, "# Fulano\n")
+    path = ResumeWriter(out).write(JOB, "prompt aqui\n\n", rank=3)
     assert path.parent == out
-    assert path.name == f"acai-tech_desenvolvedor-python-junior_{JOB.uid}.md"
-    content = path.read_text(encoding="utf-8")
-    assert "https://x/1" in content and content.endswith("# Fulano\n")
+    assert path.name == f"03_acai-tech_desenvolvedor-python-junior_{JOB.uid}.txt"
+    assert path.read_text(encoding="utf-8") == "prompt aqui\n"
 
 
 def test_writer_error(tmp_path):

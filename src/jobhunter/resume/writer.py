@@ -1,4 +1,4 @@
-"""Gravação dos currículos adaptados em arquivos."""
+"""Gravação dos prompts de currículo em arquivos de texto."""
 
 from __future__ import annotations
 
@@ -20,11 +20,12 @@ def slugify(text: str) -> str:
 
 
 class ResumeWriter:
-    """Salva cada currículo adaptado como Markdown na pasta de saída.
+    """Salva cada prompt como ``.txt`` na pasta de saída.
 
-    Nome do arquivo: ``<empresa>_<titulo>_<uid>.md`` (o ``uid`` evita
-    sobrescrever vagas com mesmo título). O topo do arquivo traz um
-    comentário com o link da vaga, invisível ao converter para PDF.
+    Nome do arquivo: ``<posição>_<empresa>_<titulo>_<uid>.txt``. A posição no
+    ranking (01, 02...) deixa os arquivos ordenados do melhor para o pior no
+    gerenciador de arquivos; o ``uid`` evita sobrescrever vagas com o mesmo
+    título entre execuções.
 
     Args:
         output_dir: pasta de saída (criada se não existir).
@@ -33,18 +34,20 @@ class ResumeWriter:
     def __init__(self, output_dir: str | Path):
         self.output_dir = Path(output_dir)
 
-    def write(self, job: Job, resume_markdown: str) -> Path:
+    def write(self, job: Job, text: str, rank: int = 1) -> Path:
         """Grava o arquivo e devolve o caminho criado.
+
+        Args:
+            rank: posição da vaga no ranking (1 = melhor).
 
         Raises:
             ResumeError: se a pasta ou o arquivo não puderem ser escritos.
         """
-        path = self.output_dir / f"{slugify(job.company)}_{slugify(job.title)}_{job.uid}.md"
-        header = (f"<!-- Vaga: {job.title} | {job.company} | nota {job.score} -->\n"
-                  f"<!-- Link: {job.url} -->\n\n")
+        name = f"{rank:02d}_{slugify(job.company)}_{slugify(job.title)}_{job.uid}.txt"
+        path = self.output_dir / name
         try:
             self.output_dir.mkdir(parents=True, exist_ok=True)
-            path.write_text(header + resume_markdown.strip() + "\n", encoding="utf-8")
+            path.write_text(text.strip() + "\n", encoding="utf-8")
         except OSError as exc:
-            raise ResumeError(f"Não foi possível salvar o currículo em '{path}': {exc}") from exc
+            raise ResumeError(f"Não foi possível salvar o prompt em '{path}': {exc}") from exc
         return path

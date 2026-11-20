@@ -40,18 +40,29 @@ class FakeReader:
         return "Fulano - Python"
 
 
-class FakeTailor:
-    def __init__(self, fail_on=()):
-        self.fail_on, self.calls = set(fail_on), []
+class FakeBuilder:
+    def __init__(self):
+        self.calls = []
 
-    def tailor(self, resume_text, job):
-        self.calls.append(job.url)
-        if job.url in self.fail_on:
-            raise ResumeError("API fora do ar")
-        return f"# CV para {job.title}"
+    def build(self, job, resume_text=None):
+        self.calls.append((job.url, resume_text))
+        return f"prompt para {job.title}"
 
 
-def build(tmp_path, jobs, reader=None, tailor=None, repo=None, runner_errors=()):
+class BrokenWriter(ResumeWriter):
+    """Falha ao gravar a vaga indicada (simula disco cheio, permissão...)."""
+
+    def __init__(self, output_dir, fail_url):
+        super().__init__(output_dir)
+        self.fail_url = fail_url
+
+    def write(self, job, text, rank=1):
+        if job.url == self.fail_url:
+            raise ResumeError("disco cheio")
+        return super().write(job, text, rank)
+
+
+def build(tmp_path, jobs, reader=None, builder=None, writer=None, repo=None, runner_errors=()):
     settings = Settings(criteria=CRITERIA, sources=[], resume_path=tmp_path / "cv.pdf",
                         output_dir=tmp_path / "out", db_path=tmp_path / "jobs.db")
     repo = repo or JobRepository(":memory:")
@@ -59,7 +70,8 @@ def build(tmp_path, jobs, reader=None, tailor=None, repo=None, runner_errors=())
         settings=settings, runner=FakeRunner(jobs, runner_errors),
         filters=FilterChain.from_criteria(CRITERIA), repository=repo,
         ranker=JobRanker.from_criteria(CRITERIA), reader=reader or FakeReader(),
-        tailor=tailor or FakeTailor(), writer=ResumeWriter(settings.output_dir),
+        prompt_builder=builder or FakeBuilder(),
+        writer=writer or ResumeWriter(settings.output_dir),
     )
     return pipeline, repo
 
@@ -68,13 +80,14 @@ JOBS = [make_job(1), make_job(3), make_job(2), make_job(4, description="python p
 # Mesma nota em tudo; desempate pela data: top 2 = vagas 3 e 2.
 
 
-def test_full_run_generates_resumes_for_top_and_saves_memory(tmp_path):
+def test_full_run_generates_prompts_for_top_and_saves_memory(tmp_path):
     pipeline, repo = build(tmp_path, JOBS, runner_errors=["[x] falha HTTP"])
     result = pipeline.run()
     assert (result.collected, result.approved, result.new) == (4, 3, 3)
     assert result.rejected == {"excluded_keywords": 1}
     assert [j.url for j in result.top] == ["https://x/3", "https://x/2"]
     assert len(result.files) == 2 and all(p.exists() for p in result.files)
+    assert [p.name[:3] for p in result.files] == ["01_", "02_"]
     assert result.saved == 2 and repo.count() == 2
     assert result.errors == ["[x] falha HTTP"]
 
@@ -87,28 +100,37 @@ def test_second_run_skips_jobs_already_seen(tmp_path):
     assert [j.url for j in result.top] == ["https://x/1"]
 
 
-def test_dry_run_does_not_call_ai_nor_save(tmp_path):
-    tailor = FakeTailor()
-    pipeline, repo = build(tmp_path, JOBS, tailor=tailor)
+def test_dry_run_does_not_write_nor_save(tmp_path):
+    builder = FakeBuilder()
+    pipeline, repo = build(tmp_path, JOBS, builder=builder)
     result = pipeline.run(dry_run=True)
     assert len(result.top) == 2
-    assert tailor.calls == [] and result.files == [] and repo.count() == 0
+    assert builder.calls == [] and result.files == [] and repo.count() == 0
 
 
 def test_failed_job_is_reported_and_not_saved(tmp_path):
-    pipeline, repo = build(tmp_path, JOBS, tailor=FakeTailor(fail_on={"https://x/3"}))
+    writer = BrokenWriter(tmp_path / "out", fail_url="https://x/3")
+    pipeline, repo = build(tmp_path, JOBS, writer=writer)
     result = pipeline.run()
     assert len(result.files) == 1 and result.saved == 1
     assert not repo.has_seen(make_job(3).uid)
-    assert "API fora do ar" in result.errors[0]
+    assert "disco cheio" in result.errors[0]
 
 
-def test_unreadable_resume_stops_tailoring_without_saving(tmp_path):
-    tailor = FakeTailor()
-    pipeline, repo = build(tmp_path, JOBS, reader=FakeReader("Currículo não encontrado"), tailor=tailor)
+def test_unreadable_resume_still_writes_prompts(tmp_path):
+    builder = FakeBuilder()
+    pipeline, repo = build(tmp_path, JOBS, reader=FakeReader("Currículo não encontrado"),
+                           builder=builder)
     result = pipeline.run()
-    assert tailor.calls == [] and repo.count() == 0
-    assert result.errors == ["Currículo não encontrado"]
+    assert [text for _, text in builder.calls] == [None, None]
+    assert len(result.files) == 2 and repo.count() == 2
+    assert "Currículo não encontrado" in result.errors[0] and "anexar" in result.errors[0]
+
+
+def test_resume_text_goes_into_prompts(tmp_path):
+    builder = FakeBuilder()
+    build(tmp_path, JOBS, builder=builder)[0].run()
+    assert all(text == "Fulano - Python" for _, text in builder.calls)
 
 
 def test_no_jobs(tmp_path):
@@ -159,5 +181,6 @@ def test_format_report_lists_top_files_and_errors():
                             saved=1, errors=["[gupy] falha HTTP"])
     text = format_report(result, dry_run=False)
     for expected in ("Coletadas: 5", "salary: 3", "[ 8.2] Dev Python 1", "https://x/1",
-                     "out/cv.md", "memória: 1", "[gupy] falha HTTP"):
+                     "Prompts de currículo gerados (1)", "out/cv.md", "memória: 1",
+                     "[gupy] falha HTTP"):
         assert expected in text
