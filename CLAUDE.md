@@ -49,7 +49,7 @@ Tests never hit the network. Use the `make_client(payload, status=200)` fixture 
 
 ## Data paths
 
-`config/settings.yaml` paths (`data/resume/curriculo.pdf`, `data/output`, `data/jobs.db`) are relative to the repo root, and `.gitignore` ignores `data/...` at the root. However, the `.gitkeep` placeholders currently sit under `src/data/`. Check which location is intended before writing code that reads or writes these paths. (The original Part 1 plan put `data/{resume,output}/.gitkeep` at the repo root, so `src/data/` is likely a misplacement.)
+`config/settings.yaml` paths (`data/resume/curriculo.pdf`, `data/output`, `data/jobs.db`) are relative to the repo root. `data/` lives at the repo root; `.gitignore` ignores its contents except the `.gitkeep` placeholders, so the personal résumé, generated résumés and the database are never committed.
 
 ## Decisions from earlier development (Claude Web history)
 
