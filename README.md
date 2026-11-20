@@ -78,3 +78,22 @@ nada a instalar). Todo o SQL fica nessa classe (padrão Repository).
 - Marcar a mesma vaga de novo é ignorado; `count()` e `has_seen(uid)` ajudam a inspecionar.
 - Erros de arquivo/SQL viram `StorageError` com mensagem clara.
 - O banco fica fora do git (`.gitignore`). Apagar `data/jobs.db` "esquece" tudo.
+
+## Ranking (Parte 5)
+`ranking.JobRanker` dá uma nota de **0 a 10** a cada vaga e ordena da melhor
+para a pior. A nota é a média ponderada de regras (`BaseScoreRule`), cada uma
+avaliando um aspecto de 0 a 1:
+
+| Regra | Peso | Como pontua |
+|---|---|---|
+| `KeywordScore` | 4 | Tecnologias citadas (no título contam em dobro); 4 acertos = nota máxima |
+| `SeniorityScore` | 3 | Nível desejado no título = 1; sem nível informado = 0,5 |
+| `LocationScore` | 1 | Remota ou na cidade desejada = 1; desconhecido = 0,5 |
+| `SalaryScore` | 1 | Salário divulgado = 1; desconhecido = 0,5 |
+| `RecencyScore` | 1 | Até 7 dias = 1, cai até 0 aos 30 dias; sem data = 0,5 |
+
+    ranker = JobRanker.from_criteria(criteria)
+    melhores = ranker.top(vagas)   # top_n do settings.yaml, já com score
+
+Empates: a vaga mais recente vem primeiro. Para mudar a importância de um
+aspecto, altere o `weight` da regra em `ranking/rules.py`.

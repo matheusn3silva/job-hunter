@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from jobhunter.filters.base import BaseFilter
-from jobhunter.models import Job
+from jobhunter.models import Job, SearchCriteria
 from jobhunter.models.job import INTERNSHIP_MARKERS
 from jobhunter.utils.text import contains_term
 
@@ -15,6 +15,23 @@ KNOWN_SENIORITY_LEVELS = (
     "senior", "sr", "especialista", "staff", "principal", "lead", "tech lead",
     "líder",
 )
+
+
+def accepted_levels(criteria: SearchCriteria) -> list[str]:
+    """Níveis aceitos pelo usuário, incluindo sinônimos de estágio em inglês.
+
+    Se algum termo de estágio for aceito (ex.: "estágio"), "intern" e
+    "internship" também são. Usado pelo filtro e pelo ranking.
+    """
+    accepted = list(criteria.seniority)
+    if any(level in INTERNSHIP_MARKERS for level in accepted):
+        accepted += ["intern", "internship"]
+    return accepted
+
+
+def has_accepted_level(job: Job, criteria: SearchCriteria) -> bool:
+    """True se o título da vaga cita um dos níveis aceitos."""
+    return any(contains_term(job.title, level) for level in accepted_levels(criteria))
 
 
 class KeywordFilter(BaseFilter):
@@ -71,15 +88,9 @@ class SeniorityFilter(BaseFilter):
         if not self.criteria.seniority:
             return True
         title = job.title
-        if any(contains_term(title, level) for level in self._accepted_levels()):
+        if has_accepted_level(job, self.criteria):
             return True
         return not any(contains_term(title, level) for level in KNOWN_SENIORITY_LEVELS)
-
-    def _accepted_levels(self) -> list[str]:
-        accepted = list(self.criteria.seniority)
-        if any(level in INTERNSHIP_MARKERS for level in accepted):
-            accepted += ["intern", "internship"]
-        return accepted
 
 
 class LocationFilter(BaseFilter):
