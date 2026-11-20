@@ -11,6 +11,9 @@ dependencies = [
     "anthropic>=2.0",
 ]
 
+[project.scripts]
+jobhunter = "jobhunter.main:main"
+
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
 
