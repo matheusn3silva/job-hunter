@@ -49,7 +49,24 @@ Tests never hit the network. Use the `make_client(payload, status=200)` fixture 
 
 ## Data paths
 
-`config/settings.yaml` paths (`data/resume/curriculo.pdf`, `data/output`, `data/jobs.db`) are relative to the repo root, and `.gitignore` ignores `data/...` at the root. However, the `.gitkeep` placeholders currently sit under `src/data/`. Check which location is intended before writing code that reads or writes these paths.
+`config/settings.yaml` paths (`data/resume/curriculo.pdf`, `data/output`, `data/jobs.db`) are relative to the repo root, and `.gitignore` ignores `data/...` at the root. However, the `.gitkeep` placeholders currently sit under `src/data/`. Check which location is intended before writing code that reads or writes these paths. (The original Part 1 plan put `data/{resume,output}/.gitkeep` at the repo root, so `src/data/` is likely a misplacement.)
+
+## Decisions from earlier development (Claude Web history)
+
+Parts 1 and 2 were designed in a Claude Web chat before moving to Claude Code. Decisions already made there:
+
+- **Planned modules** (not created yet): `filters/`, `ranking/`, `resume/`, `storage/` (SQLite "seen" repository), `services/` (pipeline orchestration) and `main.py`. Each pipeline stage is its own class.
+- **Résumé**: the base résumé is a **PDF** (`data/resume/curriculo.pdf`). Tailored résumés will be generated with the Anthropic API from the job description + base résumé, **never inventing experience**.
+- **Ranking**: score by keywords / seniority / location; semantic similarity may be added later.
+- **Filters (Part 3), answered by the user**:
+  - Jobs that don't mention a seniority level (e.g. "Desenvolvedor Python") are **kept**; ranking gives them a lower score.
+  - Remote jobs restricted to other countries (e.g. "USA Only") are **removed**; accept only Worldwide, LATAM and Brazil.
+  - A job is an internship when its title contains "estágio", "estagiário" or "intern" (`Job.is_internship`); salary minimums are R$ 2,000 (internship) / R$ 3,000 (others), and jobs without salary pass (`accept_unknown_salary`).
+- **Sources**: prefer APIs/RSS over HTML scraping. **Do not scrape LinkedIn or Indeed** (they block it and forbid it in their terms). Vagas.com and Infojobs (HTML) were postponed. We Work Remotely was suggested but not implemented.
+- **Gupy**: the listing may return only a summary description; if so, fetch the full description from the job page **only for the finalists** (planned for Part 3). The user asked to read Gupy's developer docs, but that fetch failed and is still pending; field names are unconfirmed.
+- **Remotive**: salary comes as free text in USD/year, so `salary_min/max` stay `None`; do not convert currencies (it would distort the BRL filters).
+- **Distribution (final part)**: make installation on new machines easy (install script and/or Docker).
+- **Communication**: the user prefers short answers and low token usage.
 
 ## Git workflow
 
