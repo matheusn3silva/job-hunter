@@ -1,0 +1,13 @@
+# Uso:
+#   docker compose build
+#   docker compose run --rm jobhunter --dry-run   # só o ranking
+#   docker compose run --rm jobhunter             # gera os prompts em data/output
+services:
+  jobhunter:
+    build: .
+    image: jobhunter
+    # Roda com o seu usuário para os arquivos em data/ não ficarem do root.
+    user: "${UID:-1000}:${GID:-1000}"
+    volumes:
+      - ./config:/app/config:ro
+      - ./data:/app/data
