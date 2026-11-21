@@ -18,6 +18,8 @@ class ScraperRunner:
 
     Se uma fonte falhar, o erro é registrado em ``errors`` e as outras
     continuam. A mesma vaga vinda de fontes diferentes aparece uma vez só.
+    Depois de ``run``, ``counts`` diz quantas vagas cada fonte trouxe e
+    ``failures`` guarda o erro das fontes que falharam (usado pelo site).
 
     Args:
         sources: fontes ativas.
@@ -32,9 +34,11 @@ class ScraperRunner:
         self._sources = list(sources)
         self._factory = scraper_factory
         self.errors: list[str] = []
+        self.counts: dict[str, int] = {}
+        self.failures: dict[str, str] = {}
 
     def run(self, criteria: SearchCriteria) -> list[Job]:
-        self.errors = []
+        self.errors, self.counts, self.failures = [], {}, {}
         jobs: dict[str, Job] = {}
         for source in self._sources:
             try:
@@ -42,8 +46,10 @@ class ScraperRunner:
             except ScraperError as exc:
                 log.warning("%s", exc)
                 self.errors.append(str(exc))
+                self.failures[source.name] = str(exc)
                 continue
             log.info("%s: %d vagas", source.name, len(found))
+            self.counts[source.name] = len(found)
             for job in found:
                 jobs.setdefault(job.uid, job)
         return list(jobs.values())

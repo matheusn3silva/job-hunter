@@ -16,5 +16,8 @@ RUN pip install .
 COPY config ./config
 RUN mkdir -p data/resume data/output && chmod -R a+rwX data
 
+# Porta do site (serviço "web" do docker-compose).
+EXPOSE 5000
+
 ENTRYPOINT ["jobhunter"]
 CMD ["--dry-run"]

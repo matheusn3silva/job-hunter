@@ -41,3 +41,10 @@ def test_factory_unknown_source_raises():
 def test_factory_creates_registered_scrapers():
     assert type(ScraperFactory.create(src("gupy"))).__name__ == "GupyScraper"
     assert type(ScraperFactory.create(src("remotive"))).__name__ == "RemotiveScraper"
+
+def test_runner_counts_jobs_and_failures_per_source():
+    factory = lambda s: BrokenScraper(s) if s.name == "bad" else OkScraper(s)
+    runner = ScraperRunner([src("bad"), src("good")], factory)
+    runner.run(SearchCriteria())
+    assert runner.counts == {"good": 1}
+    assert runner.failures == {"bad": "quebrou"}
