@@ -12,10 +12,10 @@ sources:
     url: https://api.github.com/repos/backend-br/vagas/issues
     enabled: true
 
-  # Portal da Gupy: a API retorna 404 desde 2026-11 (investigar).
+  # Busca pública do portal da Gupy (rota não documentada; 1 requisição por palavra-chave).
   - name: gupy
     type: api
-    url: https://portal.api.gupy.io/api/job
+    url: https://portal.gupy.io/api/job-search/jobs
     enabled: true
 
   # Remotas abertas ao Brasil; limite de requisições apertado.

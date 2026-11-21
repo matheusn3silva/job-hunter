@@ -8,7 +8,7 @@ JobHunter finds developer job postings (Java, JavaScript, Python) from free sour
 
 Scrapers → Filters → Drop already-seen → Ranking → Top N → Résumé prompt (.txt) → Save memory
 
-The project is feature-complete (Parts 1–10): free scrapers, filters, seen-jobs storage, ranking, résumé prompts, the pipeline service, the `jobhunter` CLI, and installation (`install.sh`, Docker). Open issue: the Gupy endpoint returns 404. There is no CLI entry point yet.
+The project is feature-complete (Parts 1–10): free scrapers, filters, seen-jobs storage, ranking, résumé prompts, the pipeline service, the `jobhunter` CLI, and installation (`install.sh`, Docker).
 
 Code, docstrings, comments, error messages and the README are written in **Portuguese (pt-BR)**. Keep new code in the same language.
 
@@ -54,7 +54,7 @@ Source-specific constraints that shape the code:
 - **github-frontendbr / github-backendbr** (`GitHubVagasScraper`, same class registered under two names): open issues of community job repos, 1 request per repo (`per_page=100`); pull requests skipped; `[Remoto]`/label "Remoto" → `remote=True`, `location="Brasil"`; a `[City/UF]` prefix becomes `location`; company guessed from "... na Empresa" or "... - Empresa"; labels become `tags`.
 - **jobicy**: one request with `geo=brazil` (tight rate limit, 429 on quick repeats); `jobLevel` (unless "Any") becomes a tag.
 - **weworkremotely**: RSS parsed with `xml.etree` via `BaseScraper._get_text`; title "Company: Role"; `region` becomes `location`; `parse_datetime` also accepts RFC 822 dates.
-- **gupy**: ⚠️ as of 2026-11-20 the configured endpoint (`portal.api.gupy.io/api/job`) returns 404, and so does `/api/v1/jobs`; the runner isolates the failure. Needs a new endpoint or to be disabled. Unofficial portal API; `location` is `city, state, country` (country defaults to "Brasil", so the location filter accepts remote Gupy jobs); one request per keyword (empty term if no keywords), results merged by `uid`. Items missing title or URL are skipped.
+- **gupy**: uses the public portal search `https://portal.gupy.io/api/job-search/jobs` (`jobName`, `limit` ≤ 100, `offset`; response `data[]` + `pagination`), found in the portal's JS bundle on 2026-11-21. No login, full descriptions; undocumented, so it may change. The official `api.gupy.io/api/v1/jobs` needs a company Bearer token (401) and is not usable. One request per keyword (empty term if no keywords), results merged by `uid`; `location` is `city, state, country` (country defaults to "Brasil"); items missing title or URL are skipped.
 - **remotive**: public API with a tight rate limit (~4 calls/day) and 24h delay. It makes **one** request for the whole `software-dev` category and leaves keyword filtering to the filter stage. Job links must point to Remotive (terms of use). `candidate_required_location` becomes `location` so the location filter can drop country-restricted postings.
 
 ## Testing
@@ -77,7 +77,6 @@ Parts 1 and 2 were designed in a Claude Web chat before moving to Claude Code. D
   - Remote jobs restricted to other countries (e.g. "USA Only") are **removed**; accept only Worldwide, LATAM and Brazil.
   - A job is an internship when its title contains "estágio", "estagiário" or "intern" (`Job.is_internship`, plain substring match); salary minimums are R$ 2,000 (internship) / R$ 3,000 (others), and jobs without salary pass (`accept_unknown_salary`).
 - **Sources**: prefer APIs/RSS over HTML scraping. **Do not scrape LinkedIn or Indeed** (they block it and forbid it in their terms). Vagas.com and Infojobs (HTML) were postponed. We Work Remotely was suggested but not implemented.
-- **Gupy**: the listing may return only a summary description; if so, fetch the full description from the job page **only for the finalists** (planned for Part 3). The user asked to read Gupy's developer docs, but that fetch failed and is still pending; field names are unconfirmed.
 - **Remotive**: salary comes as free text in USD/year, so `salary_min/max` stay `None`; do not convert currencies (it would distort the BRL filters).
 - **Distribution (final part)**: make installation on new machines easy (install script and/or Docker).
 - **Communication**: the user prefers short answers and low token usage.

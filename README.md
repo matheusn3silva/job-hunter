@@ -79,7 +79,7 @@ Todas as fontes são **gratuitas e sem chave**:
 | `jobicy` | API pública | Remotas abertas ao Brasil (`geo=brazil`); 1 requisição; limite apertado |
 | `weworkremotely` | RSS | Remotas de programação; a região vira `location` |
 | `remotive` | API pública | 1 requisição; máx. ~4/dia; a versão gratuita devolve poucas vagas |
-| `gupy` | API do portal (não oficial) | ⚠️ retorna 404 desde 2026-11 (a investigar) |
+| `gupy` | Busca pública do portal (`portal.gupy.io/api/job-search/jobs`) | 1 requisição por palavra-chave (até 100 vagas, descrição completa); rota não documentada, pode mudar |
 
 **Por que não LinkedIn/Indeed?** Não têm API pública de busca de vagas
 (só para parceiros), os termos de uso proíbem scraping, bloqueiam robôs
@@ -185,3 +185,10 @@ falsa):
   `--config-dir`), então o comando funciona de qualquer pasta.
 
 Códigos de saída: `0` ok; `1` erro de configuração ou de memória.
+
+### Por que a Gupy usa a busca do portal?
+A API oficial (`api.gupy.io/api/v1/jobs`) exige token de empresa cliente
+(responde 401 sem ele). O site `portal.gupy.io` busca vagas pela rota pública
+`/api/job-search/jobs` (parâmetros `jobName`, `limit`, `offset`), sem login;
+o `robots.txt` do portal permite acesso. Como não é documentada, pode mudar:
+se isso acontecer, o JobHunter mostra o aviso e segue com as outras fontes.
