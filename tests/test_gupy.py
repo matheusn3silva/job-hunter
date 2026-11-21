@@ -4,7 +4,7 @@ from jobhunter.config.settings import SourceConfig
 from jobhunter.models import SearchCriteria
 from jobhunter.scrapers import GupyScraper, ScraperError
 
-SOURCE = SourceConfig(name="gupy", type="api", url="https://portal.api.gupy.io/api/job")
+SOURCE = SourceConfig(name="gupy", type="api", url="https://portal.gupy.io/api/job-search/jobs")
 ITEM = {
     "id": 1, "name": "Desenvolvedor Python Júnior", "description": "<p>Django</p>",
     "careerPageName": "Acme", "city": "São Paulo", "state": "SP",
@@ -30,6 +30,8 @@ def test_one_request_per_keyword_and_dedup(make_client):
     jobs = GupyScraper(SOURCE, client).fetch(SearchCriteria(keywords=["python", "java"]))
     assert len(client.requests) == 2
     assert len(jobs) == 1  # mesma vaga nas duas buscas
+    params = client.requests[0].url.params
+    assert (params["jobName"], params["limit"], params["offset"]) == ("python", "100", "0")
 
 
 def test_skips_items_without_title_or_url(make_client):

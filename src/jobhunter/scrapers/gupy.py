@@ -1,4 +1,4 @@
-"""Scraper da Gupy (API pública do portal de vagas)."""
+"""Scraper da Gupy (busca pública do portal de vagas portal.gupy.io)."""
 
 from __future__ import annotations
 
@@ -8,23 +8,29 @@ from jobhunter.models import Job, SearchCriteria
 from jobhunter.scrapers.base import BaseScraper
 from jobhunter.utils.text import parse_datetime, strip_html
 
-PAGE_SIZE = 50
+PAGE_SIZE = 100  # máximo aceito pela busca do portal
 
 
 class GupyScraper(BaseScraper):
     """Busca vagas na Gupy, uma requisição por palavra-chave.
 
-    A API do portal não é oficialmente documentada: os campos usados são
-    ``data[]`` com ``name``, ``careerPageName``, ``jobUrl``, ``city``,
-    ``state``, ``workplaceType``, ``publishedDate``, ``description`` e
-    ``type``. Itens sem título ou link são ignorados.
+    Usa a mesma rota que o site ``portal.gupy.io`` chama ao pesquisar
+    (``/api/job-search/jobs?jobName=...&limit=...&offset=...``): pública,
+    sem login e com a descrição completa. A API oficial (``api.gupy.io``)
+    exige token de empresa cliente, por isso não serve para uso pessoal.
+
+    A rota não é documentada e pode mudar sem aviso; se falhar, o runner
+    registra o erro e as outras fontes continuam. Campos usados: ``data[]``
+    com ``name``, ``careerPageName``, ``jobUrl``, ``city``, ``state``,
+    ``workplaceType``, ``publishedDate``, ``description`` e ``type``. Itens
+    sem título ou link são ignorados.
     """
 
     def _fetch(self, criteria: SearchCriteria) -> list[Job]:
         jobs: dict[str, Job] = {}
         for term in criteria.keywords or [""]:
             payload = self._get_json(
-                self.source.url, {"name": term, "limit": PAGE_SIZE, "offset": 0}
+                self.source.url, {"jobName": term, "limit": PAGE_SIZE, "offset": 0}
             )
             for item in payload.get("data", []):
                 job = self._parse(item)
