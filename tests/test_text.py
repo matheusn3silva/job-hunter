@@ -6,7 +6,12 @@ from jobhunter.utils.text import contains_term, parse_datetime, strip_html
 
 
 def test_strip_html():
-    assert strip_html("<p>Olá <b>mundo</b></p><ul><li>Java</li></ul>") == "Olá mundo Java"
+    assert strip_html("<p>Olá <b>mundo</b></p><ul><li>Java</li><li>  SQL </li></ul>") == \
+        "Olá mundo\nJava\nSQL"
+
+
+def test_strip_html_keeps_line_breaks_and_collapses_spaces():
+    assert strip_html("linha 1<br>linha   2<br><br><div> </div>fim") == "linha 1\nlinha 2\nfim"
 
 
 def test_strip_html_handles_none():

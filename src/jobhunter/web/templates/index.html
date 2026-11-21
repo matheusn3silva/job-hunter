@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JobHunter</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+{# Macro: selo redondo com a sigla e a cor da fonte da vaga. #}
+{% macro badge(name, size="") -%}
+  {%- set st = style_for(name) -%}
+  <span class="badge {{ size }}" style="background: {{ st.color }}" title="{{ st.label }}">{{ st.initials }}</span>
+{%- endmacro %}
+
+{# Macro: cartão de vaga (lista do top ou "outras vagas"). #}
+{% macro job_card(job, rank, compact=False) -%}
+  <article class="job {{ 'compact' if compact }}" data-uid="{{ job.uid }}" tabindex="0">
+    <div class="job-rank">#{{ rank }}</div>
+    {{ badge(job.source) }}
+    <div class="job-main">
+      <h3 class="job-title">{{ job.title }}</h3>
+      <p class="job-meta">
+        {{ job.company or "Empresa não informada" }} ·
+        {{ "Remota" if job.remote else (job.location or "Local não informado") }}
+        {% if job.posted_at %}· {{ job.posted_at.strftime("%d/%m") }}{% endif %}
+      </p>
+      <p class="job-links">
+        <a href="{{ job.url }}" target="_blank" rel="noopener" class="link">Ver vaga original ↗</a>
+        <span class="muted">via {{ style_for(job.source).label }}</span>
+        {% if job.uid in prompted %}<span class="pill ok">prompt criado</span>{% endif %}
+      </p>
+    </div>
+    <div class="job-side">
+      <span class="score" title="Nota de 0 a 10">{{ "%.1f"|format(job.score) }}</span>
+      {% if compact and job.uid not in prompted %}
+        <button class="btn small" data-action="prompt-job" data-uid="{{ job.uid }}">Gerar prompt</button>
+      {% endif %}
+    </div>
+  </article>
+{%- endmacro %}
+
+<header class="topbar">
+  <div class="brand">
+    <h1>JobHunter</h1>
+    <p class="muted">Vagas do seu perfil, de graça. Você mesmo se candidata.</p>
+  </div>
+  <div class="actions">
+    <span class="resume-status {{ 'ok' if resume_exists else 'warn' }}">
+      {{ "Currículo anexado ✓" if resume_exists else "Sem currículo" }}
+    </span>
+    <label class="btn secondary">
+      {{ "Trocar currículo" if resume_exists else "Anexar currículo (PDF)" }}
+      <input type="file" id="resume-input" accept="application/pdf,.pdf" hidden>
+    </label>
+    <button class="btn primary" id="search-btn">Buscar vagas</button>
+  </div>
+</header>
+
+<section class="sources" aria-label="Onde buscamos">
+  <span class="muted">Buscando em:</span>
+  {% for src in sources %}
+    <a class="source {{ 'failed' if src.error }}" href="{{ src.style.site or '#' }}" target="_blank" rel="noopener"
+       title="{{ src.error or src.style.label }}">
+      {{ badge(src.name, "small") }}
+      <span>{{ src.style.label }}</span>
+      {% if src.error %}<span class="count err">falhou</span>
+      {% elif src.count is not none %}<span class="count">{{ src.count }}</span>{% endif %}
+    </a>
+  {% endfor %}
+</section>
+
+<div id="toast" class="toast" role="status" hidden></div>
+
+<main class="layout">
+  <section class="results">
+    {% if not result %}
+      <div class="empty">
+        <h2>Nenhuma busca ainda</h2>
+        <p>Anexe seu currículo e clique em <strong>Buscar vagas</strong>. A busca leva cerca de 1 minuto.</p>
+      </div>
+    {% else %}
+      <p class="summary muted">
+        {{ result.collected }} coletadas · {{ result.approved }} aprovadas nos filtros · {{ result.new }} novas
+        {% if result.rejected %}· descartes: {% for name, n in result.rejected|dictsort %}{{ name }} {{ n }}{{ ", " if not loop.last }}{% endfor %}{% endif %}
+      </p>
+
+      <div class="section-head">
+        <h2>Top {{ top|length }}</h2>
+        {% if top %}<button class="btn primary" data-action="prompt-top">Gerar prompts do Top</button>{% endif %}
+      </div>
+      {% for job in top %}{{ job_card(job, loop.index) }}{% else %}
+        <p class="muted">Nenhuma vaga nova. Tente de novo mais tarde.</p>
+      {% endfor %}
+
+      {% if others %}
+        <details class="others" open>
+          <summary><h2>Outras vagas ({{ others|length }})</h2></summary>
+          {% for job in others %}{{ job_card(job, top|length + loop.index, compact=True) }}{% endfor %}
+        </details>
+      {% endif %}
+    {% endif %}
+
+    <section class="prompts" id="prompts">
+      <h2>Prompts criados ({{ prompts|length }})</h2>
+      <p class="muted">Copie e cole numa IA de chat gratuita (ChatGPT, Gemini, Claude.ai) para adaptar o currículo.</p>
+      {% for p in prompts %}
+        <div class="prompt-row">
+          <span class="prompt-name">{{ p.name }}</span>
+          <span class="muted">{{ p.modified.strftime("%d/%m %H:%M") }}</span>
+          <button class="btn small" data-action="copy" data-name="{{ p.name }}">Copiar</button>
+        </div>
+      {% else %}
+        <p class="muted">Nenhum prompt ainda.</p>
+      {% endfor %}
+    </section>
+  </section>
+
+  <aside class="detail" id="detail" aria-live="polite" hidden>
+    <button class="close" id="detail-close" aria-label="Fechar">×</button>
+    <div id="detail-body"></div>
+  </aside>
+</main>
+
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

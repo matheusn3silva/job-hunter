@@ -27,6 +27,7 @@ Não precisa de Python instalado; `config/` e `data/` ficam na sua máquina.
     docker compose build
     docker compose run --rm jobhunter --dry-run   # só o ranking
     docker compose run --rm jobhunter             # gera os prompts em data/output
+    docker compose up web                         # site em http://localhost:5000
 
 O container roda com o seu usuário (`UID`/`GID`), então os arquivos em
 `data/` não ficam do root. No Windows, rode pelo Docker Desktop.
@@ -36,7 +37,31 @@ O container roda com o seu usuário (`UID`/`GID`), então os arquivos em
     pip install -e ".[dev]"
     pytest
 
-## Uso
+## Site local (Parte 12)
+    jobhunter-web              # abre http://localhost:5000 no navegador
+
+No site você:
+- **anexa o currículo** (PDF; o arquivo é conferido antes de substituir o atual);
+- clica em **Buscar vagas** e vê os ícones de **onde estamos buscando**, com
+  quantas vagas cada fonte trouxe (ou se falhou);
+- vê o **Top N** em destaque e as **Outras vagas** com menos destaque, cada uma
+  com o selo da fonte, a nota e o link da vaga original;
+- clica numa vaga para ver os **detalhes** num painel lateral (estilo LinkedIn):
+  empresa, local, data, etiquetas e a descrição completa;
+- gera os **prompts do Top** de uma vez, ou **um prompt** para uma vaga de fora do top;
+- **copia** qualquer prompt criado com um clique, na área "Prompts criados".
+
+Buscar não grava nada; só gerar o prompt salva a vaga na memória (ela não
+volta nas próximas buscas). O site só aceita conexões do seu computador
+(`127.0.0.1`) e recusa ações vindas de outros sites.
+
+Como é feito: `web/service.py` (`WebService`) tem toda a lógica; `web/app.py`
+só liga as rotas do Flask ao serviço; `templates/index.html`, `static/style.css`
+e `static/app.js` são a interface (HTML/CSS/JS puros, sem framework). O
+pipeline foi dividido em `search()` (busca e ranqueia) e `write_prompts()`
+(gera prompts e grava na memória); a CLI usa os dois em sequência.
+
+## Uso pela linha de comando
     jobhunter --dry-run        # busca, filtra e mostra o ranking (sem gravar nada)
     jobhunter                  # gera os prompts de currículo do top N e salva na memória
     jobhunter --top 5 -v       # top 5, com logs detalhados

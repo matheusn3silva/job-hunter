@@ -25,6 +25,8 @@ def make_job(n: int, **overrides) -> Job:
 class FakeRunner:
     def __init__(self, jobs, errors=()):
         self.jobs, self.errors = jobs, list(errors)
+        self.counts = {"teste": len(jobs)}
+        self.failures = {"x": e for e in errors}
 
     def run(self, criteria):
         return list(self.jobs)
@@ -131,6 +133,30 @@ def test_resume_text_goes_into_prompts(tmp_path):
     builder = FakeBuilder()
     build(tmp_path, JOBS, builder=builder)[0].run()
     assert all(text == "Fulano - Python" for _, text in builder.calls)
+
+
+def test_search_ranks_everything_and_saves_nothing(tmp_path):
+    pipeline, repo = build(tmp_path, JOBS, runner_errors=["[x] falha HTTP"])
+    result = pipeline.search()
+    assert [j.url for j in result.ranked] == ["https://x/3", "https://x/2", "https://x/1"]
+    assert result.top == result.ranked[:2]
+    assert result.source_counts == {"teste": 4}
+    assert result.source_failures == {"x": "[x] falha HTTP"}
+    assert result.files == [] and repo.count() == 0
+
+
+def test_write_prompts_for_a_single_job_uses_its_rank(tmp_path):
+    pipeline, repo = build(tmp_path, JOBS)
+    third = pipeline.search().ranked[2]
+    batch = pipeline.write_prompts([third], first_rank=3)
+    assert batch.saved == 1 and repo.has_seen(third.uid)
+    assert batch.files[0].name.startswith("03_")
+
+
+def test_write_prompts_with_no_jobs(tmp_path):
+    pipeline, repo = build(tmp_path, JOBS)
+    batch = pipeline.write_prompts([])
+    assert batch.files == [] and batch.saved == 0
 
 
 def test_no_jobs(tmp_path):

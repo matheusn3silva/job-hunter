@@ -2,12 +2,25 @@
 #   docker compose build
 #   docker compose run --rm jobhunter --dry-run   # só o ranking
 #   docker compose run --rm jobhunter             # gera os prompts em data/output
+#   docker compose up web                         # site em http://localhost:5000
 services:
   jobhunter:
     build: .
     image: jobhunter
     # Roda com o seu usuário para os arquivos em data/ não ficarem do root.
     user: "${UID:-1000}:${GID:-1000}"
+    volumes:
+      - ./config:/app/config:ro
+      - ./data:/app/data
+
+  # Site local. Só o seu computador acessa (porta ligada a 127.0.0.1).
+  web:
+    build: .
+    image: jobhunter
+    user: "${UID:-1000}:${GID:-1000}"
+    entrypoint: ["jobhunter-web", "--host", "0.0.0.0", "--no-browser"]
+    ports:
+      - "127.0.0.1:5000:5000"
     volumes:
       - ./config:/app/config:ro
       - ./data:/app/data
